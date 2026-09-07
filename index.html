@@ -20,7 +20,7 @@
 
   /* 클릭 가능한 요소는 모두 부드럽게 반응하도록 공통 트랜지션 적용 (한글병합기와 동일) */
   button, .btn-reset, .btn-black, .btn-pseudo, .btn-excel,
-  .top-col-title, .drop-zone, .mode-box, .table-container {
+  .top-col-title, .security-banner, .drop-zone, .mode-box, .table-container {
     transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease,
                 box-shadow 0.18s ease, transform 0.12s ease;
   }
@@ -47,11 +47,11 @@
     box-shadow: 0 6px 20px rgba(0,0,0,0.05);
   }
 
-  /* 상단 영역 (제목 카드 / 드롭존) */
+  /* 상단 영역 (제목 카드 / 특징 요약 / 드롭존) */
   .top-section { display: flex; flex-wrap: wrap; align-items: stretch; gap: 14px; margin-bottom: 20px; }
 
   .top-col-title {
-    flex: 0 0 260px;
+    flex: 0 0 22%;
     min-width: 190px;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
     text-align: center;
@@ -61,10 +61,41 @@
   }
   .top-col-title:hover { border-color: #fdba74; box-shadow: 0 6px 16px rgba(194,65,12,0.12); transform: translateY(-1px); }
   .title-icon { font-size: 2rem; line-height: 1; filter: drop-shadow(0 1px 1px rgba(194,65,12,0.15)); }
-  .title-main { margin: 0; color: #9a3412; font-size: 1.5rem; font-weight: 400; font-family: 'Jua', 'Pretendard Variable', sans-serif; line-height: 1.3; letter-spacing: -0.1px; }
+  .title-main { margin: 0; color: #9a3412; font-size: 1.4rem; font-weight: 400; font-family: 'Jua', 'Pretendard Variable', sans-serif; line-height: 1.3; letter-spacing: -0.1px; }
   .title-security-badge { background: #dcfce7; color: #166534; font-size: 0.78rem; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
 
-  .top-col-drop { flex: 1 1 auto; min-width: 220px; display: flex; }
+  /* 특징 요약 배너 (가운데) */
+  .top-col-guide { flex: 1 1 40%; min-width: 280px; display: flex; }
+  .security-banner {
+    width: 100%;
+    background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%);
+    border: 1px solid #bbf7d0;
+    border-radius: 14px;
+    padding: 14px 16px;
+    color: #166534;
+    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04), 0 1px 2px rgba(16, 24, 40, 0.03);
+  }
+  .security-banner:hover { border-color: #86efac; box-shadow: 0 6px 16px rgba(22,163,74,0.12); transform: translateY(-1px); }
+  .security-banner-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .security-banner-header strong { font-size: 0.95rem; color: #15803d; letter-spacing: -0.2px; }
+  .security-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .security-features li {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(187, 247, 208, 0.7);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
+  .security-features .feat-icon {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+    background: #16a34a; color: white; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.25);
+  }
+  .security-features strong { font-size: 0.78rem; color: #14532d; }
+  .security-features .feat-desc { color: #15803d; font-weight: 700; }
+
+  .top-col-drop { flex: 0 0 30%; min-width: 220px; display: flex; }
   .drop-zone {
     flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
     border: 2px dashed #3b82f6; border-radius: 12px; padding: 18px 12px; text-align: center;
@@ -144,7 +175,7 @@
 
   @media (max-width: 900px) {
     .top-section { flex-direction: column; }
-    .top-col-title, .top-col-drop { flex-basis: auto; width: 100%; }
+    .top-col-title, .top-col-guide, .top-col-drop { flex-basis: auto; width: 100%; }
   }
 
   /* ============ 검수(리뷰) 및 수동 마스킹 UI ============ */
@@ -203,7 +234,20 @@
       <div class="title-icon">🔒</div>
       <h2 class="title-main">PDF·이미지·HWPX<br>개인정보 마스킹</h2>
       <span class="title-security-badge">🔒 100% 브라우저 로컬 처리</span>
-      <button class="btn-reset" onclick="resetAll()">🔄 초기화</button>
+    </div>
+
+    <div class="top-col-guide">
+      <div class="security-banner">
+        <div class="security-banner-header">
+          <strong>🔒 개인정보 보안 100% 보장</strong>
+          <button class="btn-reset" onclick="resetAll()">🔄 초기화</button>
+        </div>
+        <ul class="security-features">
+          <li><span class="feat-icon">📄</span><span><strong>PDF·이미지·HWPX 지원</strong> <span class="feat-desc">: 전자문서, 스캔본(OCR), 한글 파일까지 처리</span></span></li>
+          <li><span class="feat-icon">🎭</span><span><strong>4가지 마스킹 방식</strong> <span class="feat-desc">: 검은색·회색 가림, 초성 표시, 일련번호 방식 선택</span></span></li>
+          <li><span class="feat-icon">🔎</span><span><strong>자동 탐지 + 검수 + 2차 탐지</strong> <span class="feat-desc">: 결과를 확인하고 놓친 부분 추가, 잘못된 부분은 복귀</span></span></li>
+        </ul>
+      </div>
     </div>
 
     <div class="top-col-drop">
