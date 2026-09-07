@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF 메모리 기반 개인정보 처리 도구</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <style>
+    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 30px; background-color: #f4f7f6; color: #333; }
+    .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+    h2 { border-bottom: 2px solid #007bff; padding-bottom: 10px; color: #007bff; margin-top: 0; }
+    .input-group { margin-bottom: 18px; }
+    label { font-weight: bold; display: block; margin-bottom: 6px; }
+    input[type="text"], input[type="file"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    .help-text { font-size: 0.85em; color: #666; margin-top: 4px; }
+    
+    /* 버튼 스타일 */
+    .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+    button { flex: 1; padding: 14px; font-size: 15px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+    .btn-black { background: #212529; color: white; }
+    .btn-black:hover { background: #000000; }
+    .btn-pseudo { background: #007bff; color: white; }
+    .btn-pseudo:hover { background: #0056b3; }
+    
+    #status { margin-top: 20px; font-weight: bold; color: #28a745; text-align: center; white-space: pre-line; }
+    #mappingTable { margin-top: 20px; width: 100%; border-collapse: collapse; }
+    #mappingTable th, #mappingTable td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 14px; }
+    #mappingTable th { background-color: #f8f9fa; color: #333; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>PDF 메모리 개인정보 처리 웹앱</h2>
+  <p style="font-size: 0.9em; color: #555;">서버 전송 없이 <strong>100% 브라우저 메모리(RAM)</strong>에서 처리되며, 이미지 PDF로 재조합되어 원본 복구가 불가능합니다.</p>
+  
+  <div class="input-group">
+    <label for="pdfFile">1. PDF 파일 선택:</label>
+    <input type="file" id="pdfFile" accept="application/pdf">
+  </div>
+
+  <div class="input-group">
+    <label for="namesInput">2. 인물 이름 목록 (쉼표 구분):</label>
+    <input type="text" id="namesInput" placeholder="예: 홍길동, 김철수, 이영희">
+    <div class="help-text">마킹 처리 시 검게 가려지며, 일련번호 처리 시 A1, A2... 로 변환됩니다.</div>
+  </div>
+
+  <div class="input-group">
+    <label for="companiesInput">3. 업체/기관 상호 목록 (쉼표 구분):</label>
+    <input type="text" id="companiesInput" placeholder="예: (주)ABC, 부여군청, 현대자동차">
+    <div class="help-text">마킹 처리 시 검게 가려지며, 일련번호 처리 시 B1, B2... 로 변환됩니다.</div>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn-black" onclick="processPDF('black')">⬛ 완전 가림(검은 마킹)</button>
+    <button class="btn-pseudo" onclick="processPDF('pseudo')">🏷️ 일련번호 가명화 (A1, B1)</button>
+  </div>
+
+  <div id="status"></div>
+
+  <table id="mappingTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>구분</th>
+        <th>원본 단어</th>
+        <th>치환 결과</th>
+      </tr>
+    </thead>
+    <tbody id="mappingBody"></tbody>
+  </table>
+</div>
+
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+  async function processPDF(mode) {
+    const fileInput = document.getElementById('pdfFile');
+    const namesInput = document.getElementById('namesInput').value;
+    const companiesInput = document.getElementById('companiesInput').value;
+    const status = document.getElementById('status');
+    const table = document.getElementById('mappingTable');
+
+    if (!fileInput.files[0]) {
+      alert('PDF 파일을 선택해주세요.');
+      return;
+    }
+
+    status.innerText = '메모리 상에서 PDF 분석 및 변환 진행 중...';
+    table.style.display = 'none';
+
+    // 1. 단어 매핑 구축
+    const mapping = [];
+    let aCount = 1, bCount = 1;
+
+    if (namesInput.trim()) {
+      namesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
+        mapping.push({ 
+          text: name, 
+          code: mode === 'black' ? '⬛' : `A${aCount++}`, 
+          type: '인물' 
+        });
+      });
+    }
+
+    if (companiesInput.trim()) {
+      companiesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(comp => {
+        mapping.push({ 
+          text: comp, 
+          code: mode === 'black' ? '⬛' : `B${bCount++}`, 
+          type: '업체/기관' 
+        });
+      });
+    }
+
+    if (mapping.length === 0) {
+      alert('처리할 인물 이름이나 업체 상호를 최소 1개 이상 입력해주세요.');
+      status.innerText = '';
+      return;
+    }
+
+    // 일련번호 모드일 때 매핑표 출력
+    renderMappingTable(mapping, mode);
+
+    // 2. 메모리 읽기 및 변환
+    const fileBytes = await fileInput.files[0].arrayBuffer();
+    const pdfDoc = await pdfjsLib.getDocument({ data: fileBytes }).promise;
+    const newPdfDoc = await PDFLib.PDFDocument.create();
+
+    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.5 }); // 선명도 1.5배
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      // 렌더링
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+      // 텍스트 탐색 및 가림/변환 처리
+      const textContent = await page.getTextContent();
+      
+      for (const item of textContent.items) {
+        const itemText = item.str.trim();
+        if (!itemText) continue;
+
+        mapping.forEach(m => {
+          if (itemText.includes(m.text)) {
+            const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+            const x = tx[4];
+            const y = tx[5] - (item.height * viewport.scale);
+            const width = item.width * viewport.scale;
+            const height = item.height * viewport.scale;
+
+            if (mode === 'black') {
+              // Mode 1: 검은 상자로 완벽 마킹
+              ctx.fillStyle = '#000000';
+              ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
+            } else {
+              // Mode 2: 흰 바탕 지우기 후 일련번호(A
