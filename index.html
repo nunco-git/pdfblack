@@ -19,7 +19,6 @@
     .top-card h2 { color: #007bff; margin: 0 0 8px 0; font-size: 1.3rem; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
     .top-card p { margin: 0; font-size: 0.88em; color: #555; line-height: 1.4; }
     
-    /* 특징 영역 리스트 */
     .feature-list { margin: 0; padding-left: 18px; font-size: 0.85em; color: #444; }
     .feature-list li { margin-bottom: 4px; }
 
@@ -37,7 +36,7 @@
     input[type="text"], select { width: 100%; padding: 8px 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
     .help-text { font-size: 0.8em; color: #666; margin-top: 3px; }
 
-    /* 하단 버튼 4개 나란히 배치 */
+    /* 하단 버튼 그룹 */
     .btn-group { display: flex; gap: 8px; margin-top: 15px; }
     .btn-group button { flex: 1; padding: 12px 8px; font-size: 13px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
     .btn-reset { background: #dc3545; color: white; }
@@ -54,7 +53,7 @@
     .error { color: #dc3545; }
     .loading { color: #007bff; }
 
-    /* 건별 상세 결과 표 및 헤더 */
+    /* 결과 표 영역 */
     .table-container { margin-top: 20px; border: 1px solid #ddd; border-radius: 6px; background: #fff; padding: 15px; }
     .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .table-title { font-weight: bold; font-size: 0.95em; color: #333; }
@@ -73,23 +72,20 @@
 <div class="container">
   <!-- 상단 3분할 영역 -->
   <div class="top-grid">
-    <!-- 1. 제목 영역 -->
     <div class="top-card">
       <h2>PDF 개인정보 가림 도구</h2>
       <p>서버 전송 없이 <strong>100% 브라우저 메모리(RAM)</strong>에서 처리되며, 복구 불가능한 보안 파일로 생성됩니다.</p>
     </div>
 
-    <!-- 2. 특징 영역 -->
     <div class="top-card">
       <strong style="margin-bottom:6px; font-size:0.9em; color:#007bff;">주요 특징</strong>
       <ul class="feature-list">
-        <li>전자 PDF 및 스캔 사진 문서(OCR) 완벽 지원</li>
-        <li>단어 미입력 시 주요 개인정보 자동 탐지 가림</li>
-        <li>기존 글자 크기 유지 가명화 및 엑셀 내역 다운로드</li>
+        <li>정밀 위치 계산으로 해당 단어만 정확히 치환</li>
+        <li>첫 글자 유지 가명화(홍**) 또는 일련번호(A1) 선택 가능</li>
+        <li>기존 글자 크기 자동 유지 및 엑셀 결과 다운로드</li>
       </ul>
     </div>
 
-    <!-- 3. 드래그 앤 드롭 존 -->
     <div class="top-card" style="padding:0; border:none; background:none;">
       <div class="drop-zone" id="dropZone" onclick="document.getElementById('pdfFile').click()">
         <span style="font-size: 1.8em;">📁</span>
@@ -101,13 +97,24 @@
     </div>
   </div>
 
-  <!-- 입력 및 설정 영역 -->
+  <!-- 설정 영역 -->
   <div class="mode-box">
-    <label for="docType">📄 문서 유형 선택:</label>
-    <select id="docType">
-      <option value="text">일반 PDF (텍스트 검색/복사 가능한 전자문서 - 초고속)</option>
-      <option value="ocr">스캔본 PDF / 종이 사진 문서 (OCR 문자 인식 사용 - 수 초 소요)</option>
-    </select>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+      <div>
+        <label for="docType">📄 문서 유형 선택:</label>
+        <select id="docType">
+          <option value="text">일반 PDF (텍스트 검색/복사 가능한 전자문서 - 초고속)</option>
+          <option value="ocr">스캔본 PDF / 종이 사진 문서 (OCR 문자 인식 사용)</option>
+        </select>
+      </div>
+      <div>
+        <label for="pseudoFormat">🏷️ 가명화 표기 방식 선택:</label>
+        <select id="pseudoFormat">
+          <option value="initial">첫 글자만 남기기 (예: 홍길동 → 홍**, (주)부여 → (주)**)</option>
+          <option value="code">일련번호 방식 (예: 인물 → A1, A2 / 상호 → B1, B2)</option>
+        </select>
+      </div>
+    </div>
   </div>
 
   <div class="input-group">
@@ -122,17 +129,17 @@
     <div class="help-text">특정 상호나 가려야 할 추가 단어를 입력해주세요.</div>
   </div>
 
-  <!-- 하단 버튼 4개 나란히 배치 -->
+  <!-- 버튼 그룹 -->
   <div class="btn-group">
     <button class="btn-reset" onclick="resetAll()">🔄 초기화</button>
     <button class="btn-file" onclick="document.getElementById('pdfFile').click()">📂 파일 다시 선택</button>
     <button class="btn-black" onclick="processDocument('black')">⬛ 2. 완전 가림 (개인정보)</button>
-    <button class="btn-pseudo" onclick="processDocument('pseudo')">🏷️ 3. 가명화 (A1, B1)</button>
+    <button class="btn-pseudo" onclick="processDocument('pseudo')">🏷️ 3. 가명화 처리</button>
   </div>
 
   <div id="status"></div>
 
-  <!-- 건별 치환 결과 상세 표 영역 -->
+  <!-- 처리 결과 표 영역 -->
   <div class="table-container" id="tableContainer" style="display:none;">
     <div class="table-header">
       <span class="table-title">📋 개인정보 치환 / 가림 처리 결과 내역</span>
@@ -158,7 +165,6 @@
 <script>
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
 
-  // 대표적인 한국 개인정보 정규표현식 패턴
   const PII_PATTERNS = [
     { name: '주민등록번호', regex: /\d{6}[-~\s]?[1-4]\d{6}/g },
     { name: '전화번호', regex: /(01[016789]|02|0[3-9][0-9])[-~\s]?\d{3,4}[-~\s]?\d{4}/g },
@@ -167,7 +173,7 @@
     { name: '운전면허번호', regex: /\d{2}[-~\s]?\d{2}[-~\s]?\d{6}[-~\s]?\d{2}/g }
   ];
 
-  let detectedRecords = []; // 치환 결과 저장 배열
+  let detectedRecords = [];
 
   function updateFileName(input) {
     const display = document.getElementById('fileNameDisplay');
@@ -178,13 +184,13 @@
     }
   }
 
-  // 전체 초기화 함수
   function resetAll() {
     document.getElementById('pdfFile').value = '';
     document.getElementById('namesInput').value = '';
     document.getElementById('companiesInput').value = '';
     document.getElementById('fileNameDisplay').innerText = '선택된 파일 없음';
     document.getElementById('docType').value = 'text';
+    document.getElementById('pseudoFormat').value = 'initial';
     
     const status = document.getElementById('status');
     status.innerText = '';
@@ -220,8 +226,16 @@
     }
   });
 
+  // 첫 글자만 남기고 * 처리해주는 함수
+  function generateInitialMask(text) {
+    if (!text) return text;
+    if (text.length <= 1) return text;
+    return text.charAt(0) + '*'.repeat(text.length - 1);
+  }
+
   async function processDocument(mode) {
     const docType = document.getElementById('docType').value;
+    const pseudoFormat = document.getElementById('pseudoFormat').value;
     const fileInput = document.getElementById('pdfFile');
     const namesInput = document.getElementById('namesInput').value;
     const companiesInput = document.getElementById('companiesInput').value;
@@ -241,27 +255,29 @@
 
     if (namesInput.trim()) {
       namesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
-        mapping.push({ text: name, code: mode === 'black' ? '⬛ (가림)' : `A${aCount++}`, type: '인물 이름' });
+        let code = mode === 'black' ? '⬛ (가림)' : (pseudoFormat === 'initial' ? generateInitialMask(name) : `A${aCount++}`);
+        mapping.push({ text: name, code: code, type: '인물 이름' });
       });
     }
 
     if (companiesInput.trim()) {
       companiesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(comp => {
-        mapping.push({ text: comp, code: mode === 'black' ? '⬛ (가림)' : `B${bCount++}`, type: '상호/단어' });
+        let code = mode === 'black' ? '⬛ (가림)' : (pseudoFormat === 'initial' ? generateInitialMask(comp) : `B${bCount++}`);
+        mapping.push({ text: comp, code: code, type: '상호/단어' });
       });
     }
 
     const isAutoDetectMode = (mapping.length === 0);
 
     if (isAutoDetectMode && mode === 'pseudo') {
-      alert('일련번호 가명화(A1, B1)는 치환 대상을 식별해야 하므로, 가릴 인물 이름이나 상호를 입력해 주세요.');
+      alert('가명화 기능(홍**, A1)은 치환 대상을 식별해야 하므로, 인물 이름이나 상호를 입력해 주세요.');
       return;
     }
 
     status.className = 'loading';
     status.innerText = isAutoDetectMode 
       ? '문서 내 주요 개인정보 탐지 및 가림 처리 중...'
-      : '지정한 단어 분석 및 가림/가명화 처리 중...';
+      : '지정한 단어 분석 및 정밀 위치 치환 처리 중...';
 
     try {
       if (docType === 'text') {
@@ -279,7 +295,7 @@
     }
   }
 
-  // 1. 일반 PDF 처리
+  // 1. 일반 PDF 정밀 치환 처리
   async function processStandardPDF(file, mapping, mode, isAutoDetectMode) {
     const fileBytes = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: fileBytes });
@@ -299,16 +315,16 @@
       const textContent = await page.getTextContent();
       
       for (const item of textContent.items) {
-        const itemText = item.str.trim();
-        if (!itemText) continue;
+        const itemText = item.str;
+        if (!itemText || !itemText.trim()) continue;
 
         const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
-        const x = tx[4];
-        const y = tx[5] - (item.height * viewport.scale);
-        const width = item.width * viewport.scale;
-        const height = item.height * viewport.scale;
+        const fullX = tx[4];
+        const fullY = tx[5] - (item.height * viewport.scale);
+        const fullWidth = item.width * viewport.scale;
+        const fullHeight = item.height * viewport.scale;
 
-        applyMaskAndRecord(ctx, itemText, x, y, width, height, viewport.scale, mapping, mode, isAutoDetectMode, pageNum);
+        applyPreciseMask(ctx, itemText, fullX, fullY, fullWidth, fullHeight, mapping, mode, isAutoDetectMode, pageNum);
       }
 
       await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
@@ -317,7 +333,7 @@
     await downloadPdf(newPdfDoc, file.name, mode);
   }
 
-  // 2. 스캔본/사진 문서 처리
+  // 2. 스캔본/사진 OCR 치환 처리
   async function processOCRDocument(file, mapping, mode, isAutoDetectMode) {
     const status = document.getElementById('status');
     status.innerText = 'OCR 한국어 엔진 로딩 중...';
@@ -346,7 +362,7 @@
         
         for (const word of ret.data.words) {
           const { x0, y0, x1, y1 } = word.bbox;
-          applyMaskAndRecord(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAutoDetectMode, pageNum);
+          applyPreciseMask(ctx, word.text, x0, y0, x1 - x0, y1 - y0, mapping, mode, isAutoDetectMode, pageNum);
         }
 
         await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
@@ -364,7 +380,7 @@
 
       for (const word of ret.data.words) {
         const { x0, y0, x1, y1 } = word.bbox;
-        applyMaskAndRecord(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAutoDetectMode, 1);
+        applyPreciseMask(ctx, word.text, x0, y0, x1 - x0, y1 - y0, mapping, mode, isAutoDetectMode, 1);
       }
 
       await appendCanvasToPdf(newPdfDoc, canvas, img.width, img.height);
@@ -374,60 +390,60 @@
     await downloadPdf(newPdfDoc, file.name, mode);
   }
 
-  // 가림/치환 실행 및 기존 글자 크기 반영
-  function applyMaskAndRecord(ctx, targetText, x, y, width, height, scale, mapping, mode, isAutoDetectMode, pageNum) {
-    let matchedType = '';
-    let matchedText = '';
-    let resultCode = '';
-    let shouldMask = false;
-
+  // 🎯 문장 내에서 타겟 단어 위치를 정확하게 계산하여 부분 치환하는 함수
+  function applyPreciseMask(ctx, fullText, x, y, width, height, mapping, mode, isAutoDetectMode, pageNum) {
     if (isAutoDetectMode) {
       for (const pii of PII_PATTERNS) {
         pii.regex.lastIndex = 0;
-        const match = pii.regex.exec(targetText);
-        if (match) {
-          shouldMask = true;
-          matchedType = pii.name;
-          matchedText = match[0];
-          resultCode = '⬛ (완전 가림)';
-          break;
+        let match;
+        while ((match = pii.regex.exec(fullText)) !== null) {
+          const targetStr = match[0];
+          const startIndex = match.index;
+          
+          drawSubMask(ctx, fullText, targetStr, startIndex, x, y, width, height, pii.name, '⬛ (완전 가림)', 'black', pageNum);
         }
       }
     } else {
       for (const m of mapping) {
-        if (targetText.includes(m.text)) {
-          shouldMask = true;
-          matchedType = m.type;
-          matchedText = m.text;
-          resultCode = mode === 'black' ? '⬛ (완전 가림)' : m.code;
-          break;
+        let startIndex = 0;
+        while ((startIndex = fullText.indexOf(m.text, startIndex)) !== -1) {
+          const targetStr = m.text;
+          const resultCode = mode === 'black' ? '⬛ (완전 가림)' : m.code;
+
+          drawSubMask(ctx, fullText, targetStr, startIndex, x, y, width, height, m.type, resultCode, mode, pageNum);
+          startIndex += m.text.length;
         }
       }
     }
+  }
 
-    if (shouldMask) {
-      if (mode === 'black') {
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
-      } else {
-        // 기존 글자 영역 흰색으로 덮기
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
+  // 부분 영역 캔버스 그리기 및 기록
+  function drawSubMask(ctx, fullText, targetStr, startIndex, x, y, width, height, type, resultCode, mode, pageNum) {
+    const charWidth = width / fullText.length;
+    const targetX = x + (startIndex * charWidth);
+    const targetWidth = Math.max(targetStr.length * charWidth, 12);
 
-        // 기존 높이(height)를 기반으로 폰트 크기 자동 맞춤
-        const fontSize = Math.max(10, Math.round(height * 0.85));
-        ctx.fillStyle = '#0056b3';
-        ctx.font = `bold ${fontSize}px sans-serif`;
-        ctx.fillText(resultCode, x, y + height - (height * 0.15));
-      }
+    if (mode === 'black') {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(targetX - 1, y - 1, targetWidth + 2, height + 2);
+    } else {
+      // 해당 단어 부분만 흰색으로 지우기
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(targetX - 1, y - 1, targetWidth + 2, height + 2);
 
-      detectedRecords.push({
-        page: pageNum,
-        type: matchedType,
-        original: matchedText,
-        result: resultCode
-      });
+      // 기존 글자 크기(height) 반영하여 치환 텍스트 입력
+      const fontSize = Math.max(10, Math.round(height * 0.85));
+      ctx.fillStyle = '#0056b3';
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.fillText(resultCode, targetX, y + height - (height * 0.15));
     }
+
+    detectedRecords.push({
+      page: pageNum,
+      type: type,
+      original: targetStr,
+      result: resultCode
+    });
   }
 
   async function appendCanvasToPdf(pdfDoc, canvas, width, height) {
@@ -489,14 +505,12 @@
     document.getElementById('tableContainer').style.display = 'block';
   }
 
-  // 엑셀(CSV) 다운로드 기능
   function exportToExcel() {
     if (detectedRecords.length === 0) {
       alert('다운로드할 내역이 없습니다.');
       return;
     }
 
-    // 한글 깨짐 방지 BOM 추가
     let csvContent = "\uFEFF번호,페이지,탐지 유형,탐지된 원본 텍스트,치환/가림 결과\n";
 
     detectedRecords.forEach((item, index) => {
