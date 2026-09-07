@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PDF 및 이미지 개인정보 처리 도구</title>
+  <title>PDF 및 이미지 개인정보 자동 가림 도구</title>
   <!-- CDN 설정 (PDF.js, pdf-lib, Tesseract.js) -->
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
@@ -65,7 +65,7 @@
     <!-- 1. 제목 영역 -->
     <div class="top-card">
       <h2>PDF 개인정보 가림 도구</h2>
-      <p>서버 전송 없이 <strong>100% 브라우저 메모리(RAM)</strong>에서 처리되며, 복구 불가능한 파일로 재조합됩니다.</p>
+      <p>서버 전송 없이 <strong>100% 브라우저 메모리(RAM)</strong>에서 처리되며, 복구 불가능한 보안 파일로 생성됩니다.</p>
     </div>
 
     <!-- 2. 특징 영역 -->
@@ -73,8 +73,8 @@
       <strong style="margin-bottom:6px; font-size:0.9em; color:#007bff;">주요 특징</strong>
       <ul class="feature-list">
         <li>전자 PDF 및 스캔 사진 문서(OCR) 완벽 지원</li>
-        <li>특정 단어 가림 및 일련번호 가명화(A1, B1)</li>
-        <li>단어 미입력 시 전체 영역 블라인드 가림</li>
+        <li>단어 미입력 시 주요 개인정보(주민번호/전화/이메일 등) 자동 탐지 가림</li>
+        <li>지정 단어 선택 마킹 및 일련번호 가명화(A1, B1) 지원</li>
       </ul>
     </div>
 
@@ -100,21 +100,21 @@
   </div>
 
   <div class="input-group">
-    <label for="namesInput">인물 이름 목록 (쉼표 구분):</label>
-    <input type="text" id="namesInput" placeholder="예: 홍길동, 김철수, 이영희">
-    <div class="help-text">입력 시 해당 단어만 가려지며, 비워둘 경우 선택된 모드에 따라 처리됩니다.</div>
+    <label for="namesInput">인물 이름 목록 (쉼표 구분 - 선택사항):</label>
+    <input type="text" id="namesInput" placeholder="예: 홍길동, 김철수 (비워두면 주민번호/전화번호 등 패턴 자동 가림)">
+    <div class="help-text">가리고 싶은 성명이나 특정 인물 이름을 입력해주세요.</div>
   </div>
 
   <div class="input-group">
-    <label for="companiesInput">업체/기관 상호 목록 (쉼표 구분):</label>
-    <input type="text" id="companiesInput" placeholder="예: (주)ABC, 부여군청, 현대자동차">
-    <div class="help-text">입력 시 해당 단어만 가려지며, 비워둘 경우 선택된 모드에 따라 처리됩니다.</div>
+    <label for="companiesInput">업체/기관 상호 또는 특정 단어 목록 (쉼표 구분 - 선택사항):</label>
+    <input type="text" id="companiesInput" placeholder="예: (주)ABC, 부여군청 (비워두면 주민번호/전화번호 등 패턴 자동 가림)">
+    <div class="help-text">특정 상호나 가려야 할 추가 단어를 입력해주세요.</div>
   </div>
 
   <!-- 하단 버튼 3개 나란히 배치 -->
   <div class="btn-group">
     <button class="btn-file" onclick="document.getElementById('pdfFile').click()">1. 파일 다시 선택</button>
-    <button class="btn-black" onclick="processDocument('black')">2. ⬛ 완전 가림 (검은 마킹)</button>
+    <button class="btn-black" onclick="processDocument('black')">2. ⬛ 완전 가림 (개인정보 마킹)</button>
     <button class="btn-pseudo" onclick="processDocument('pseudo')">3. 🏷️ 일련번호 가명화 (A1, B1)</button>
   </div>
 
@@ -124,7 +124,7 @@
     <thead>
       <tr>
         <th>구분</th>
-        <th>원본 단어</th>
+        <th>원본 단어 / 패턴</th>
         <th>치환 결과</th>
       </tr>
     </thead>
@@ -135,7 +135,15 @@
 <script>
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
 
-  // 파일 선택 표시 업데이트
+  // 대표적인 한국 개인정보 정규표현식 패턴
+  const PII_PATTERNS = [
+    { name: '주민등록번호', regex: /\d{6}[-~\s]?[1-4]\d{6}/g },
+    { name: '전화번호', regex: /(01[016789]|02|0[3-9][0-9])[-~\s]?\d{3,4}[-~\s]?\d{4}/g },
+    { name: '이메일', regex: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g },
+    { name: '사업자등록번호', regex: /\d{3}[-~\s]?\d{2}[-~\s]?\d{5}/g },
+    { name: '운전면허번호', regex: /\d{2}[-~\s]?\d{2}[-~\s]?\d{6}[-~\s]?\d{2}/g }
+  ];
+
   function updateFileName(input) {
     const display = document.getElementById('fileNameDisplay');
     if (input.files && input.files[0]) {
@@ -145,7 +153,6 @@
     }
   }
 
-  // 드래그 앤 드롭 이벤트 처리
   const dropZone = document.getElementById('dropZone');
   ['dragenter', 'dragover'].forEach(eventName => {
     dropZone.addEventListener(eventName, (e) => {
@@ -177,7 +184,6 @@
     const namesInput = document.getElementById('namesInput').value;
     const companiesInput = document.getElementById('companiesInput').value;
     const status = document.getElementById('status');
-    const table = document.getElementById('mappingTable');
 
     if (!fileInput.files[0]) {
       alert('파일을 선택해주거나 드래그 앤 드롭 존에 넣어주세요.');
@@ -195,31 +201,31 @@
 
     if (companiesInput.trim()) {
       companiesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(comp => {
-        mapping.push({ text: comp, code: mode === 'black' ? '⬛' : `B${bCount++}`, type: '업체/기관' });
+        mapping.push({ text: comp, code: mode === 'black' ? '⬛' : `B${bCount++}`, type: '기타/상호' });
       });
     }
 
-    const isAllMaskMode = (mapping.length === 0);
+    const isAutoDetectMode = (mapping.length === 0);
 
-    if (isAllMaskMode && mode === 'pseudo') {
-      alert('일련번호 가명화(A1, B1)를 적용하려면 인물 이름이나 업체 상호를 최소 1개 이상 입력해주세요.');
+    if (isAutoDetectMode && mode === 'pseudo') {
+      alert('일련번호 가명화(A1, B1)는 치환 대상을 식별해야 하므로, 가릴 인물 이름이나 상호를 입력해 주세요.');
       return;
     }
 
     status.className = 'loading';
-    if (isAllMaskMode) {
-      status.innerText = '입력 항목이 없어 [문서 전체 텍스트 영역 검은 가림]을 진행합니다...';
-      table.style.display = 'none';
+    if (isAutoDetectMode) {
+      status.innerText = '입력된 단어가 없어 문서 내 주요 개인정보(주민번호, 전화번호, 이메일 등)를 자동 탐지하여 가림 처리 중...';
+      renderAutoDetectTable();
     } else {
-      status.innerText = '메모리 상에서 특정 지정 단어 처리 중...';
+      status.innerText = '메모리 상에서 지정한 단어 가림 처리 중...';
       renderMappingTable(mapping, mode);
     }
 
     try {
       if (docType === 'text') {
-        await processStandardPDF(fileInput.files[0], mapping, mode, isAllMaskMode);
+        await processStandardPDF(fileInput.files[0], mapping, mode, isAutoDetectMode);
       } else {
-        await processOCRDocument(fileInput.files[0], mapping, mode, isAllMaskMode);
+        await processOCRDocument(fileInput.files[0], mapping, mode, isAutoDetectMode);
       }
     } catch (err) {
       console.error(err);
@@ -229,7 +235,7 @@
   }
 
   // 1. 일반 PDF 처리 (PDF.js)
-  async function processStandardPDF(file, mapping, mode, isAllMaskMode) {
+  async function processStandardPDF(file, mapping, mode, isAutoDetectMode) {
     const fileBytes = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: fileBytes });
     const pdfDoc = await loadingTask.promise;
@@ -257,17 +263,17 @@
         const width = item.width * viewport.scale;
         const height = item.height * viewport.scale;
 
-        applyMaskToCanvas(ctx, itemText, x, y, width, height, viewport.scale, mapping, mode, isAllMaskMode);
+        applyMaskToCanvas(ctx, itemText, x, y, width, height, viewport.scale, mapping, mode, isAutoDetectMode);
       }
 
       await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
     }
 
-    await downloadPdf(newPdfDoc, file.name, isAllMaskMode, mode);
+    await downloadPdf(newPdfDoc, file.name, mode);
   }
 
   // 2. 스캔본/사진 문서 처리 (Tesseract.js OCR)
-  async function processOCRDocument(file, mapping, mode, isAllMaskMode) {
+  async function processOCRDocument(file, mapping, mode, isAutoDetectMode) {
     const status = document.getElementById('status');
     status.innerText = 'OCR 한국어 엔진 로딩 중...';
 
@@ -295,7 +301,7 @@
         
         for (const word of ret.data.words) {
           const { x0, y0, x1, y1 } = word.bbox;
-          applyMaskToCanvas(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAllMaskMode);
+          applyMaskToCanvas(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAutoDetectMode);
         }
 
         await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
@@ -313,36 +319,53 @@
 
       for (const word of ret.data.words) {
         const { x0, y0, x1, y1 } = word.bbox;
-        applyMaskToCanvas(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAllMaskMode);
+        applyMaskToCanvas(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAutoDetectMode);
       }
 
       await appendCanvasToPdf(newPdfDoc, canvas, img.width, img.height);
     }
 
     await worker.terminate();
-    await downloadPdf(newPdfDoc, file.name, isAllMaskMode, mode);
+    await downloadPdf(newPdfDoc, file.name, mode);
   }
 
-  function applyMaskToCanvas(ctx, targetText, x, y, width, height, scale, mapping, mode, isAllMaskMode) {
-    if (isAllMaskMode) {
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
+  // 개인정보 판단 및 마킹 함수
+  function applyMaskToCanvas(ctx, targetText, x, y, width, height, scale, mapping, mode, isAutoDetectMode) {
+    let shouldMask = false;
+
+    if (isAutoDetectMode) {
+      // 입력 단어가 없을 때: 주요 개인정보 패턴 감지
+      for (const pii of PII_PATTERNS) {
+        pii.regex.lastIndex = 0; // 정규식 상태 초기화
+        if (pii.regex.test(targetText)) {
+          shouldMask = true;
+          break;
+        }
+      }
     } else {
+      // 입력 단어가 있을 때: 해당 단어가 포함되어 있는지 확인
       mapping.forEach(m => {
         if (targetText.includes(m.text)) {
-          if (mode === 'black') {
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
-          } else {
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
-
-            ctx.fillStyle = '#0056b3';
-            ctx.font = `bold ${14 * scale}px sans-serif`;
-            ctx.fillText(m.code, x, y + height - 2);
-          }
+          shouldMask = true;
         }
       });
+    }
+
+    // 마킹 실행
+    if (shouldMask) {
+      if (mode === 'black') {
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
+      } else if (!isAutoDetectMode) {
+        // 일련번호 가명화 모드
+        const matched = mapping.find(m => targetText.includes(m.text));
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
+
+        ctx.fillStyle = '#0056b3';
+        ctx.font = `bold ${14 * scale}px sans-serif`;
+        ctx.fillText(matched ? matched.code : '⬛', x, y + height - 2);
+      }
     }
   }
 
@@ -353,19 +376,19 @@
     newPage.drawImage(pngImage, { x: 0, y: 0, width, height });
   }
 
-  async function downloadPdf(pdfDoc, originalName, isAllMaskMode, mode) {
+  async function downloadPdf(pdfDoc, originalName, mode) {
     const status = document.getElementById('status');
     const pdfBytesOutput = await pdfDoc.save();
     const blob = new Blob([pdfBytesOutput], { type: 'application/pdf' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     
-    const prefix = isAllMaskMode ? '전체블라인드' : (mode === 'black' ? '선택마킹' : '가명화');
+    const prefix = mode === 'black' ? '개인정보가림' : '가명화';
     link.download = `${prefix}_${originalName.split('.')[0]}.pdf`;
     link.click();
 
     status.className = 'success';
-    status.innerText = `처리 완료! [${prefix}] 처리된 PDF 파일이 다운로드되었습니다.`;
+    status.innerText = `처리 완료! 개인정보가 [${prefix}] 처리된 PDF 파일이 다운로드되었습니다.`;
   }
 
   function loadImage(file) {
@@ -384,6 +407,19 @@
       const tr = document.createElement('tr');
       const displayCode = mode === 'black' ? '<span style="color:red;">[완전 가림]</span>' : `<strong>${m.code}</strong>`;
       tr.innerHTML = `<td>${m.type}</td><td>${m.text}</td><td>${displayCode}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('mappingTable').style.display = 'table';
+  }
+
+  function renderAutoDetectTable() {
+    const tbody = document.getElementById('mappingBody');
+    tbody.innerHTML = '';
+
+    PII_PATTERNS.forEach(pii => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>자동 감지</td><td>${pii.name} 패턴</td><td><span style="color:red;">[완전 가림]</span></td>`;
       tbody.appendChild(tr);
     });
 
