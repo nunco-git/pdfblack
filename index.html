@@ -3,23 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PDF 및 이미지 개인정보 자동 가림 도구</title>
+<title>PDF·이미지·HWPX 파일 개인정보 마스킹</title>
 
 <!-- 본문용 Pretendard, 제목용 Jua 폰트 (한글병합기와 동일) -->
 <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
 
-<!-- PDF.js, pdf-lib, Tesseract.js -->
+<!-- PDF.js, pdf-lib, Tesseract.js, JSZip(HWPX 처리용) -->
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
 <style>
   * { box-sizing: border-box; }
 
   /* 클릭 가능한 요소는 모두 부드럽게 반응하도록 공통 트랜지션 적용 (한글병합기와 동일) */
   button, .btn-reset, .btn-black, .btn-pseudo, .btn-excel,
-  .top-col-title, .security-banner, .drop-zone, .mode-box, .warning-box, .table-container {
+  .top-col-title, .drop-zone, .mode-box, .table-container {
     transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease,
                 box-shadow 0.18s ease, transform 0.12s ease;
   }
@@ -46,11 +47,11 @@
     box-shadow: 0 6px 20px rgba(0,0,0,0.05);
   }
 
-  /* 상단 3분할 영역 (제목 카드 / 보안 안내 배너 / 드롭존) */
+  /* 상단 영역 (제목 카드 / 드롭존) */
   .top-section { display: flex; flex-wrap: wrap; align-items: stretch; gap: 14px; margin-bottom: 20px; }
 
   .top-col-title {
-    flex: 0 0 22%;
+    flex: 0 0 260px;
     min-width: 190px;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
     text-align: center;
@@ -63,36 +64,7 @@
   .title-main { margin: 0; color: #9a3412; font-size: 1.5rem; font-weight: 400; font-family: 'Jua', 'Pretendard Variable', sans-serif; line-height: 1.3; letter-spacing: -0.1px; }
   .title-security-badge { background: #dcfce7; color: #166534; font-size: 0.78rem; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
 
-  .top-col-guide { flex: 1 1 40%; min-width: 260px; display: flex; }
-  .security-banner {
-    width: 100%;
-    background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%);
-    border: 1px solid #bbf7d0;
-    border-radius: 14px;
-    padding: 14px 16px;
-    color: #166534;
-    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04), 0 1px 2px rgba(16, 24, 40, 0.03);
-  }
-  .security-banner:hover { border-color: #86efac; box-shadow: 0 6px 16px rgba(22,163,74,0.12); transform: translateY(-1px); }
-  .security-banner strong.banner-title { display: block; font-size: 0.95rem; color: #15803d; letter-spacing: -0.2px; margin-bottom: 8px; }
-  .security-banner-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
-  .security-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .security-features li {
-    display: flex; align-items: center; gap: 10px;
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(187, 247, 208, 0.7);
-    border-radius: 10px;
-    padding: 6px 10px;
-    font-size: 0.78rem;
-  }
-  .security-features .feat-icon {
-    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
-    background: #16a34a; color: white; display: flex; align-items: center; justify-content: center;
-    font-size: 11px; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.25);
-  }
-  .security-features .feat-desc { color: #15803d; font-weight: 700; }
-
-  .top-col-drop { flex: 0 0 30%; min-width: 220px; display: flex; }
+  .top-col-drop { flex: 1 1 auto; min-width: 220px; display: flex; }
   .drop-zone {
     flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
     border: 2px dashed #3b82f6; border-radius: 12px; padding: 18px 12px; text-align: center;
@@ -104,12 +76,6 @@
   .drop-zone span.drop-sub { font-size: 0.75em; color: #60a5fa; margin-top: 4px; display: block; }
   #fileNameDisplay { margin-top: 8px; font-size: 0.78em; color: #166534; font-weight: 700; word-break: break-all; }
   input[type="file"] { display: none; }
-
-  /* ⚠️ 자동탐지 한계 안내 배너 */
-  .warning-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(180,83,9,0.05); }
-  .warning-box:hover { border-color: #fcd34d; box-shadow: 0 6px 16px rgba(180,83,9,0.1); transform: translateY(-1px); }
-  .warning-box strong { color: #92400e; font-size: 0.88rem; }
-  .warning-box p { margin: 6px 0 0 0; font-size: 0.8rem; color: #78350f; line-height: 1.55; }
 
   /* 중간 설정 영역 */
   .mode-box { background: #fafafa; border: 1px solid #e2e8f0; padding: 16px; border-radius: 12px; margin-bottom: 16px; }
@@ -123,6 +89,13 @@
   }
   input[type="text"]:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
   .help-text { font-size: 0.78em; color: #64748b; margin-top: 4px; }
+  .row-with-select { display: flex; gap: 10px; align-items: stretch; }
+  .row-with-select input[type="text"] { flex: 1 1 auto; min-width: 0; }
+  .row-with-select select { flex: 0 0 190px; min-width: 150px; }
+  @media (max-width: 640px) {
+    .row-with-select { flex-direction: column; }
+    .row-with-select select { flex-basis: auto; width: 100%; }
+  }
 
   /* 하단 버튼 그룹 - 부드러운 색상으로 조정 */
   .btn-group { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
@@ -171,57 +144,77 @@
 
   @media (max-width: 900px) {
     .top-section { flex-direction: column; }
-    .top-col-title, .top-col-guide, .top-col-drop { flex-basis: auto; width: 100%; }
+    .top-col-title, .top-col-drop { flex-basis: auto; width: 100%; }
   }
+
+  /* ============ 검수(리뷰) 및 수동 마스킹 UI ============ */
+  .btn-manual-mode {
+    background: #3b82f6; color: white; border: none; padding: 7px 14px; border-radius: 8px;
+    font-weight: 700; font-size: 0.82em; cursor: pointer; box-shadow: 0 2px 6px rgba(59,130,246,0.2);
+    white-space: nowrap;
+  }
+  .btn-manual-mode.active { background: #f59e0b; box-shadow: 0 2px 6px rgba(245,158,11,0.3); }
+  .btn-manual-mode:hover { filter: brightness(0.95); }
+
+  #reviewPages { display: flex; flex-direction: column; gap: 18px; max-height: 640px; overflow-y: auto; padding: 4px; }
+  .review-page-wrapper { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; background: #f8fafc; }
+  .review-page-label { font-weight: 700; font-size: 0.82em; color: #475569; margin-bottom: 8px; }
+  .review-canvas-box { position: relative; line-height: 0; background: #fff; border-radius: 6px; overflow: hidden; user-select: none; }
+  #reviewPages.manual-mode .review-canvas-box { cursor: crosshair; }
+
+  .mask-box {
+    position: absolute; box-sizing: border-box;
+    border: 2px solid #ef4444; background: rgba(239,68,68,0.20);
+    cursor: pointer;
+  }
+  .mask-box:hover { background: rgba(239,68,68,0.32); }
+  .mask-box.inactive { border-style: dashed; border-color: #94a3b8; background: rgba(148,163,184,0.14); }
+  .mask-box.inactive:hover { background: rgba(148,163,184,0.24); }
+  .mask-box.manual { border-color: #1d4ed8; background: rgba(29,78,216,0.20); }
+  .mask-box.manual.inactive { border-color: #94a3b8; }
+  .mask-box-del {
+    position: absolute; top: -9px; right: -9px; width: 18px; height: 18px; border-radius: 50%;
+    background: #ef4444; color: #fff; font-size: 12px; line-height: 18px; text-align: center;
+    cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.25); font-weight: 700;
+  }
+  .manual-drawing { position: absolute; border: 2px dashed #3b82f6; background: rgba(59,130,246,0.15); pointer-events: none; }
+
+  .row-checkbox { width: 16px; height: 16px; cursor: pointer; }
+  .btn-row-del { background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; padding: 4px 8px; font-size: 0.78em; font-weight: 700; cursor: pointer; }
+  .btn-row-del:hover { background: #fecaca; }
+  tr.row-inactive td { opacity: 0.45; }
+
+  .finalize-bar { text-align: center; margin-top: 18px; }
+  .btn-finalize {
+    flex: none; padding: 14px 32px; font-size: 14px; border-radius: 10px; border: none; cursor: pointer;
+    font-weight: 700; font-family: inherit; background: #a7f3d0; color: #065f46;
+    box-shadow: 0 2px 6px rgba(16,185,129,0.15);
+  }
+  .btn-finalize:hover { background: #6ee7b7; transform: translateY(-2px); box-shadow: 0 6px 14px rgba(16,185,129,0.22); }
 </style>
 </head>
 <body>
 
 <div class="app-container">
 <div class="container">
-  <!-- 상단 3분할 영역 -->
+  <!-- 상단 영역 -->
   <div class="top-section">
     <div class="top-col-title">
       <div class="title-icon">🔒</div>
-      <h2 class="title-main">PDF·이미지<br>개인정보 마스킹</h2>
+      <h2 class="title-main">PDF·이미지·HWPX<br>개인정보 마스킹</h2>
       <span class="title-security-badge">🔒 100% 브라우저 로컬 처리</span>
-    </div>
-
-    <div class="top-col-guide">
-      <div class="security-banner">
-        <div class="security-banner-header">
-          <strong class="banner-title" style="margin-bottom:0;">🔒 개인정보 보안 100% 보장</strong>
-          <button class="btn-reset" onclick="resetAll()">🔄 초기화</button>
-        </div>
-        <ul class="security-features">
-          <li><span class="feat-icon">🌐</span><span><strong>외부 서버 전송 ZERO</strong> <span class="feat-desc">: 파일이 브라우저 안에서만 처리</span></span></li>
-          <li><span class="feat-icon">🖼️</span><span><strong>원본 텍스트 완전 제거</strong> <span class="feat-desc">: 이미지로 재구성해 복사·추출 불가</span></span></li>
-          <li><span class="feat-icon">🎯</span><span><strong>정밀 위치 자동 가림</strong> <span class="feat-desc">: 줄 단위로 분석해 정확한 위치만 처리</span></span></li>
-        </ul>
-      </div>
+      <button class="btn-reset" onclick="resetAll()">🔄 초기화</button>
     </div>
 
     <div class="top-col-drop">
       <div class="drop-zone" id="dropZone" onclick="document.getElementById('pdfFile').click()">
         <span class="drop-icon">📁</span>
         <strong>클릭하여 파일 선택<br>또는 드래그 앤 드롭</strong>
-        <span class="drop-sub">(PDF, JPG, PNG 파일 가능)</span>
+        <span class="drop-sub">(PDF, JPG, PNG, HWPX 파일 가능)</span>
         <div id="fileNameDisplay">선택된 파일 없음</div>
-        <input type="file" id="pdfFile" accept="application/pdf, image/png, image/jpeg" onchange="updateFileName(this)">
+        <input type="file" id="pdfFile" accept="application/pdf, image/png, image/jpeg, .hwpx" onchange="updateFileName(this)">
       </div>
     </div>
-  </div>
-
-  <!-- 자동 탐지 한계 안내 -->
-  <div class="warning-box">
-    <strong>⚠️ 자동 탐지는 "패턴 + 문맥(라벨) 추정"입니다 — 100% 정확하지 않습니다</strong>
-    <p>
-      이름/상호 입력란을 비워두면 ①주민등록번호·전화번호·이메일·사업자등록번호·운전면허번호·여권번호·신용카드번호 등 <strong>형식이 정해진 값</strong>과,
-      ②"성명/성함/이름/담당자" 뒤의 이름, "단체명/기관명/시설명/보조사업자명" 뒤의 기관·단체명, "연락처/핸드폰/전화번호" 뒤의 번호, "주소/소재지" 뒤의 주소,
-      팀장·과장 등 <strong>직책 앞뒤에 붙은 이름</strong>까지 문맥으로 함께 추정해 가립니다.
-      다만 이는 어디까지나 "추정"이라 라벨 표현이 다르거나 문장 구조가 특이하면 놓칠 수 있고(과소 가림), 반대로 라벨 뒤에 개인정보가 아닌 단어가 와도 가려질 수 있습니다(과다 가림).
-      <strong>중요한 문서는 반드시 처리 결과를 눈으로 한 번 더 확인해 주세요.</strong> 확실하게 가리고 싶은 값은 아래 입력란에 직접 입력하는 것이 가장 정확합니다.
-    </p>
   </div>
 
   <!-- 설정 영역 -->
@@ -233,36 +226,38 @@
           <option value="text">일반 PDF (텍스트 검색/복사 가능한 전자문서 - 초고속)</option>
           <option value="ocr">스캔본 PDF / 종이 사진 문서 (OCR 문자 인식 사용)</option>
         </select>
+        <div class="help-text">HWPX(한글) 파일은 이 선택과 무관하게 자동으로 인식되어 처리됩니다.</div>
       </div>
       <div>
-        <label for="pseudoFormat">🏷️ 가명화 표기 방식 선택:</label>
-        <select id="pseudoFormat">
-          <option value="initial">첫 글자만 남기기 (예: 홍길동 → 홍**, (주)부여 → (주)**)</option>
-          <option value="code">일련번호 방식 (예: 인물 → A1, A2 / 상호 → B1, B2)</option>
+        <label for="maskStyle">🎭 개인정보 마스킹 방식 선택:</label>
+        <select id="maskStyle">
+          <option value="black">⬛ 개인정보 검은색으로 마스킹</option>
+          <option value="gray">▨ 개인정보 회색으로 마스킹</option>
+          <option value="initial">🔤 첫 글자만 남기기 (예: 홍길동 → 홍**, (주)부여 → (주)**)</option>
+          <option value="code">🔢 일련번호 방식 (예: 인물 → A1, A2 / 상호 → B1, B2)</option>
         </select>
       </div>
     </div>
-  </div>
 
-  <div class="input-group">
-    <label for="namesInput">인물 이름 목록 (쉼표 구분 - 선택사항):</label>
-    <input type="text" id="namesInput" placeholder="예: 홍길동, 김철수 (자동 탐지되지 않으므로 가릴 이름은 직접 입력)">
-    <div class="help-text">가리고 싶은 성명이나 특정 인물 이름을 입력해주세요. (이름은 자동 탐지되지 않습니다)</div>
-  </div>
-
-  <div class="input-group">
-    <label for="companiesInput">업체/기관 상호, 주소, 계좌번호 등 특정 단어 목록 (쉼표 구분 - 선택사항):</label>
-    <input type="text" id="companiesInput" placeholder="예: (주)ABC, 부여군청, 충남 부여군 ○○로 12 (자동 탐지 안 되는 항목은 직접 입력)">
-    <div class="help-text">특정 상호·주소·계좌번호 등 가려야 할 추가 단어를 입력해주세요.</div>
-  </div>
-
-  <!-- 버튼 그룹 -->
-  <div class="btn-group">
-    <button class="btn-black" onclick="processDocument('black')">⬛ 완전 가림 (개인정보)</button>
-    <button class="btn-pseudo" onclick="processDocument('pseudo')">🏷️ 가명화 처리</button>
+    <!-- 자동 탐지 버튼 (문서유형 선택 바로 아래) -->
+    <div class="btn-group">
+      <button class="btn-black" style="flex:1 1 100%;" onclick="processDocument()">🔍 자동 탐지 실행</button>
+    </div>
   </div>
 
   <div id="status"></div>
+
+  <!-- 검수 및 수동 보정 영역 -->
+  <div class="table-container" id="reviewContainer" style="display:none;">
+    <div class="table-header">
+      <span class="table-title">🔍 처리 결과 검수 · 보정</span>
+      <button class="btn-manual-mode" id="manualModeBtn" onclick="toggleManualMode()">✏️ 수동 마스킹 추가: 꺼짐</button>
+    </div>
+    <div id="reviewPages"></div>
+    <div class="finalize-bar">
+      <button class="btn-finalize" onclick="finalizeAndDownload()">✅ 검수 완료 - 최종 PDF 다운로드</button>
+    </div>
+  </div>
 
   <!-- 처리 결과 표 영역 -->
   <div class="table-container" id="tableContainer" style="display:none;">
@@ -274,15 +269,61 @@
       <table id="mappingTable">
         <thead>
           <tr>
-            <th style="width: 8%;">번호</th>
-            <th style="width: 12%;">페이지</th>
-            <th style="width: 20%;">탐지 유형</th>
-            <th style="width: 40%;">탐지된 원본 텍스트/패턴</th>
-            <th style="width: 20%;">치환 / 가림 결과</th>
+            <th style="width: 6%;">번호</th>
+            <th style="width: 8%;">페이지</th>
+            <th style="width: 16%;">탐지 유형</th>
+            <th style="width: 26%;">탐지된 원본 텍스트/패턴</th>
+            <th style="width: 16%;">치환 / 가림 결과</th>
+            <th style="width: 14%;">포함 여부</th>
+            <th style="width: 14%;">삭제</th>
           </tr>
         </thead>
         <tbody id="mappingBody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- 2차 탐지: 자동 탐지가 놓친 부분을 이름/상호 목록으로 추가 지정, 잘못 가려진 것은 복귀 목록으로 원복 -->
+  <div class="mode-box">
+    <div class="input-group">
+      <label for="namesInput">① 인물 이름 목록 (쉼표 구분 — 추가로 가릴 이름):</label>
+      <div class="row-with-select">
+        <input type="text" id="namesInput" placeholder="예: 홍길동, 김철수">
+        <select id="namesMaskStyle">
+          <option value="black">⬛ 검은색으로 마스킹</option>
+          <option value="gray">▨ 회색으로 마스킹</option>
+          <option value="initial">🔤 첫 글자만 남기기</option>
+          <option value="code">🔢 일련번호 방식</option>
+        </select>
+      </div>
+    </div>
+    <div class="input-group">
+      <label for="companiesInput">② 업체/기관 상호, 주소 등 목록 (쉼표 구분 — 추가로 가릴 단어):</label>
+      <div class="row-with-select">
+        <input type="text" id="companiesInput" placeholder="예: (주)ABC, 부여군청, 충남 부여군 ○○로 12">
+        <select id="companiesMaskStyle">
+          <option value="black">⬛ 검은색으로 마스킹</option>
+          <option value="gray">▨ 회색으로 마스킹</option>
+          <option value="initial">🔤 첫 글자만 남기기</option>
+          <option value="code">🔢 일련번호 방식</option>
+        </select>
+      </div>
+    </div>
+    <div class="input-group" style="margin-bottom: 0;">
+      <label for="restoreInput">③ 원래대로 복귀(마스킹 해제)할 단어 목록 (쉼표 구분 — 1차 자동탐지가 잘못 가린 것을 복원):</label>
+      <div class="row-with-select">
+        <input type="text" id="restoreInput" placeholder="예: 잘못 가려진 단어나 이름을 그대로 입력">
+        <select id="restoreMaskStyle" title="복귀 항목은 마스킹을 해제하므로 이 선택은 사용되지 않습니다">
+          <option value="black">⬛ (사용 안 함)</option>
+          <option value="gray">▨ (사용 안 함)</option>
+          <option value="initial">🔤 (사용 안 함)</option>
+          <option value="code">🔢 (사용 안 함)</option>
+        </select>
+      </div>
+      <div class="help-text">체크된 항목은 마스킹 방식과 무관하게 완전히 원래 텍스트로 복귀(마스킹 해제)됩니다.</div>
+    </div>
+    <div class="btn-group">
+      <button class="btn-black" style="flex:1 1 100%;" onclick="runSecondDetection()">🔎 2차 탐지 실행 (추가 가림 + 복귀 반영)</button>
     </div>
   </div>
 </div>
@@ -351,6 +392,25 @@
     }
   ];
 
+  // ============================================================
+  // 🗂️ 검수(리뷰) 단계 상태
+  // pagesData : PDF/이미지용 — 페이지별 "깨끗한(마스킹 그리기 전)" 캔버스 + 크기 정보
+  // hwpxState : HWPX(한글)용 — zip 원본 + 섹션(본문 XML)별 텍스트/문자 매핑 정보
+  // allBoxes  : 자동 탐지 + 수동 추가된 모든 마스킹 항목(파일 종류에 따라
+  //             좌표(x,y,width,height) 또는 텍스트 구간(start,end) 정보를 가짐)
+  // 실제 마스킹은 "최종 다운로드"를 누를 때만 캔버스/문서에 반영됩니다.
+  // ============================================================
+  let pagesData = [];
+  let hwpxState = null; // { zip, sections: [{ path, xmlDoc, fullText, charMap }] }
+  let currentFileKind = 'pdfimg'; // 'pdfimg' | 'hwpx'
+  let allBoxes = [];
+  let boxIdCounter = 0;
+  let manualModeOn = false;
+  let currentFileObj = null;
+  let currentProcessMode = 'black'; // 마지막으로 실행한 마스킹 방식(black/gray/initial/code) - 파일명·수동박스 스타일에 사용
+  let autoCodeCounter = 1; // '일련번호 방식' 선택 시 자동 탐지 항목에 매길 번호(실행마다 초기화)
+
+  // 하위 호환: 표 렌더링 등에서 참조할 수 있어 남겨두되, 실제 소스는 allBoxes
   let detectedRecords = [];
 
   function updateFileName(input) {
@@ -366,9 +426,12 @@
     document.getElementById('pdfFile').value = '';
     document.getElementById('namesInput').value = '';
     document.getElementById('companiesInput').value = '';
+    document.getElementById('restoreInput').value = '';
     document.getElementById('fileNameDisplay').innerText = '선택된 파일 없음';
     document.getElementById('docType').value = 'text';
-    document.getElementById('pseudoFormat').value = 'initial';
+    document.getElementById('maskStyle').value = 'black';
+    document.getElementById('namesMaskStyle').value = 'black';
+    document.getElementById('companiesMaskStyle').value = 'black';
     
     const status = document.getElementById('status');
     status.innerText = '';
@@ -377,6 +440,20 @@
     detectedRecords = [];
     document.getElementById('mappingBody').innerHTML = '';
     document.getElementById('tableContainer').style.display = 'none';
+
+    pagesData = [];
+    hwpxState = null;
+    currentFileKind = 'pdfimg';
+    allBoxes = [];
+    boxIdCounter = 0;
+    manualModeOn = false;
+    currentFileObj = null;
+    document.getElementById('reviewPages').innerHTML = '';
+    document.getElementById('reviewContainer').style.display = 'none';
+    const manualBtn = document.getElementById('manualModeBtn');
+    manualBtn.style.display = '';
+    manualBtn.classList.remove('active');
+    manualBtn.innerText = '✏️ 수동 마스킹 추가: 꺼짐';
   }
 
   const dropZone = document.getElementById('dropZone');
@@ -411,12 +488,10 @@
     return text.charAt(0) + '*'.repeat(text.length - 1);
   }
 
-  async function processDocument(mode) {
+  async function processDocument() {
     const docType = document.getElementById('docType').value;
-    const pseudoFormat = document.getElementById('pseudoFormat').value;
+    const maskStyle = document.getElementById('maskStyle').value;
     const fileInput = document.getElementById('pdfFile');
-    const namesInput = document.getElementById('namesInput').value;
-    const companiesInput = document.getElementById('companiesInput').value;
     const status = document.getElementById('status');
 
     if (!fileInput.files[0]) {
@@ -424,47 +499,57 @@
       return;
     }
 
+    const file = fileInput.files[0];
+    const isHwpx = /\.hwpx$/i.test(file.name);
+
+    // 새 파일 처리 시작 시 이전 검수 상태 초기화
     detectedRecords = [];
+    pagesData = [];
+    hwpxState = null;
+    currentFileKind = isHwpx ? 'hwpx' : 'pdfimg';
+    allBoxes = [];
+    boxIdCounter = 0;
+    autoCodeCounter = 1;
+    manualModeOn = false;
+    currentFileObj = file;
+    currentProcessMode = maskStyle;
     document.getElementById('tableContainer').style.display = 'none';
     document.getElementById('mappingBody').innerHTML = '';
+    document.getElementById('reviewContainer').style.display = 'none';
+    document.getElementById('reviewPages').innerHTML = '';
+    const manualBtn = document.getElementById('manualModeBtn');
+    manualBtn.classList.remove('active');
+    manualBtn.innerText = '✏️ 수동 마스킹 추가: 꺼짐';
 
+    // 1차(자동) 탐지는 항상 정규식/문맥 기반 자동 탐지 모드로 동작합니다.
+    // 이름·업체 등 특정 단어 지정은 결과 확인 후 아래쪽의 2차 탐지에서 처리합니다.
     const mapping = [];
-    let aCount = 1, bCount = 1;
-
-    if (namesInput.trim()) {
-      namesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
-        let code = mode === 'black' ? '⬛ (가림)' : (pseudoFormat === 'initial' ? generateInitialMask(name) : `A${aCount++}`);
-        mapping.push({ text: name, code: code, type: '인물 이름' });
-      });
-    }
-
-    if (companiesInput.trim()) {
-      companiesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(comp => {
-        let code = mode === 'black' ? '⬛ (가림)' : (pseudoFormat === 'initial' ? generateInitialMask(comp) : `B${bCount++}`);
-        mapping.push({ text: comp, code: code, type: '상호/단어' });
-      });
-    }
-
-    const isAutoDetectMode = (mapping.length === 0);
-
-    if (isAutoDetectMode && mode === 'pseudo') {
-      alert('가명화 기능(홍**, A1)은 치환 대상을 식별해야 하므로, 인물 이름이나 상호를 입력해 주세요.');
-      return;
-    }
+    const isAutoDetectMode = true;
 
     status.className = 'loading';
-    status.innerText = isAutoDetectMode 
-      ? '문서 내 주요 개인정보 탐지 및 가림 처리 중...'
-      : '지정한 단어 분석 및 정밀 위치 치환 처리 중...';
+    status.innerText = isHwpx
+      ? 'HWPX 문서 내 주요 개인정보 탐지 중...'
+      : '문서 내 주요 개인정보 탐지 및 가림 처리 중...';
 
     try {
-      if (docType === 'text') {
-        await processStandardPDF(fileInput.files[0], mapping, mode, isAutoDetectMode);
+      if (isHwpx) {
+        await processHWPX(file, mapping, maskStyle, isAutoDetectMode);
+      } else if (docType === 'text') {
+        await processStandardPDF(file, mapping, maskStyle, isAutoDetectMode);
       } else {
-        await processOCRDocument(fileInput.files[0], mapping, mode, isAutoDetectMode);
+        await processOCRDocument(file, mapping, maskStyle, isAutoDetectMode);
       }
 
       renderDetectedRecords();
+      renderReviewUI();
+      document.getElementById('reviewContainer').style.display = 'block';
+
+      status.className = 'success';
+      if (allBoxes.length === 0) {
+        status.innerText = '자동 탐지 결과 발견된 항목이 없습니다. 아래 결과 화면에서 ' + (isHwpx ? '' : '"수동 마스킹 추가"로 직접 지정하거나, ') + '하단의 이름/업체 목록을 입력해 2차 탐지를 실행해보세요.';
+      } else {
+        status.innerText = `자동 탐지 완료! 총 ${allBoxes.length}건 발견 — 아래 결과를 확인하세요. 놓친 부분은 하단의 이름/업체 목록에 입력해 2차 탐지로 추가` + (isHwpx ? '하거나, 잘못 가려진 항목은 복귀 목록으로 되돌릴 수 있습니다.' : '하거나, 직접 드래그로 수동 지정할 수 있습니다.');
+      }
 
     } catch (err) {
       console.error(err);
@@ -473,12 +558,103 @@
     }
   }
 
-  // 1. 일반 PDF 정밀 치환 처리
-  async function processStandardPDF(file, mapping, mode, isAutoDetectMode) {
+  // 2차 탐지: ① 이름 목록 ② 업체 목록은 각자 선택한 방식으로 추가 마스킹하고,
+  // ③ 복귀 목록에 적힌 단어는 이미 마스킹된 항목 중 일치하는 것을 찾아 "제외(원래 텍스트로 복귀)" 처리합니다.
+  function runSecondDetection() {
+    if (!pagesData.length && !(hwpxState && hwpxState.sections.length)) {
+      alert('먼저 파일을 업로드하고 자동 탐지를 실행해주세요.');
+      return;
+    }
+    const namesInput = document.getElementById('namesInput').value;
+    const companiesInput = document.getElementById('companiesInput').value;
+    const restoreInput = document.getElementById('restoreInput').value;
+    const namesMaskStyle = document.getElementById('namesMaskStyle').value;
+    const companiesMaskStyle = document.getElementById('companiesMaskStyle').value;
+
+    if (!namesInput.trim() && !companiesInput.trim() && !restoreInput.trim()) {
+      alert('가릴 인물 이름/업체·단어, 또는 복귀시킬 단어를 하나 이상 입력해주세요.');
+      return;
+    }
+
+    // 재실행 시 중복 추가되지 않도록, 이전 2차 탐지(목록 기반) 결과는 새로 계산
+    allBoxes = allBoxes.filter(b => b.type !== '인물 이름' && b.type !== '상호/단어');
+
+    const nameMapping = [];
+    let aCount = 1;
+    if (namesInput.trim()) {
+      namesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
+        let code;
+        if (namesMaskStyle === 'black') code = '⬛ (가림)';
+        else if (namesMaskStyle === 'gray') code = '▨ (가림)';
+        else if (namesMaskStyle === 'initial') code = generateInitialMask(name);
+        else code = `A${aCount++}`;
+        nameMapping.push({ text: name, code: code, type: '인물 이름' });
+      });
+    }
+
+    const compMapping = [];
+    let bCount = 1;
+    if (companiesInput.trim()) {
+      companiesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(comp => {
+        let code;
+        if (companiesMaskStyle === 'black') code = '⬛ (가림)';
+        else if (companiesMaskStyle === 'gray') code = '▨ (가림)';
+        else if (companiesMaskStyle === 'initial') code = generateInitialMask(comp);
+        else code = `B${bCount++}`;
+        compMapping.push({ text: comp, code: code, type: '상호/단어' });
+      });
+    }
+
+    const before = allBoxes.length;
+    if (currentFileKind === 'hwpx' && hwpxState) {
+      hwpxState.sections.forEach((section, idx) => {
+        if (nameMapping.length) collectHwpxMatches(idx, section.fullText, nameMapping, namesMaskStyle, false, allBoxes);
+        if (compMapping.length) collectHwpxMatches(idx, section.fullText, compMapping, companiesMaskStyle, false, allBoxes);
+      });
+    } else {
+      for (const page of pagesData) {
+        for (const line of page.lines) {
+          if (nameMapping.length) collectLineBoxes(line, nameMapping, namesMaskStyle, false, page.pageNum, allBoxes);
+          if (compMapping.length) collectLineBoxes(line, compMapping, companiesMaskStyle, false, page.pageNum, allBoxes);
+        }
+      }
+    }
+    const addedCount = allBoxes.length - before;
+
+    // ③ 복귀(마스킹 해제) 목록: 이미 탐지되어 마스킹 예정인 박스 중, 원문이
+    // 입력한 단어와 일치/포함되는 것을 찾아 제외(active=false) 처리합니다.
+    // (새로운 마스킹을 만드는 것이 아니라 기존 잘못된 마스킹을 되돌리는 것이므로
+    //  마스킹 방식 선택은 사용하지 않습니다.)
+    let restoredCount = 0;
+    const restoreWords = restoreInput.split(',').map(s => s.trim()).filter(Boolean);
+    if (restoreWords.length) {
+      allBoxes.forEach(box => {
+        if (!box.active) return;
+        const matched = restoreWords.some(word => box.original && box.original.includes(word));
+        if (matched) { box.active = false; restoredCount++; }
+      });
+    }
+
+    currentProcessMode = namesMaskStyle || companiesMaskStyle || currentProcessMode;
+    renderReviewUI();
+    renderDetectedRecords();
+    document.getElementById('reviewContainer').style.display = 'block';
+
+    const status = document.getElementById('status');
+    status.className = 'success';
+    const parts = [];
+    if (addedCount > 0) parts.push(`${addedCount}건 추가 가림`);
+    if (restoredCount > 0) parts.push(`${restoredCount}건 복귀(마스킹 해제)`);
+    status.innerText = parts.length
+      ? `2차 탐지 완료! ${parts.join(', ')} 처리했습니다. 아래에서 확인 후 최종 다운로드를 눌러주세요.`
+      : '입력한 단어와 일치하는 텍스트를 찾지 못했습니다. 표기(띄어쓰기 등)를 확인해주세요.';
+  }
+
+  // 1. 일반 PDF 분석 — 마스킹은 바로 그리지 않고 박스 정보만 수집(검수용)
+  async function processStandardPDF(file, mapping, maskStyle, isAutoDetectMode) {
     const fileBytes = await file.arrayBuffer();
     const loadingTask = pdfjsLib.getDocument({ data: fileBytes });
     const pdfDoc = await loadingTask.promise;
-    const newPdfDoc = await PDFLib.PDFDocument.create();
 
     for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
       const page = await pdfDoc.getPage(pageNum);
@@ -509,22 +685,19 @@
       // 🔧 같은 줄의 조각들을 병합한 뒤 매칭 → 조각 경계에 걸친 패턴도 탐지
       const lines = buildLines(items);
       for (const line of lines) {
-        maskLine(ctx, line, mapping, mode, isAutoDetectMode, pageNum);
+        collectLineBoxes(line, mapping, maskStyle, isAutoDetectMode, pageNum, allBoxes);
       }
 
-      await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
+      pagesData.push({ pageNum, canvas, width: viewport.width, height: viewport.height, lines });
     }
-
-    await downloadPdf(newPdfDoc, file.name, mode);
   }
 
-  // 2. 스캔본/사진 OCR 치환 처리
-  async function processOCRDocument(file, mapping, mode, isAutoDetectMode) {
+  // 2. 스캔본/사진 OCR 분석 — 마스킹은 바로 그리지 않고 박스 정보만 수집(검수용)
+  async function processOCRDocument(file, mapping, maskStyle, isAutoDetectMode) {
     const status = document.getElementById('status');
     status.innerText = 'OCR 한국어 엔진 로딩 중...';
 
     const worker = await Tesseract.createWorker('kor');
-    const newPdfDoc = await PDFLib.PDFDocument.create();
 
     if (file.type === 'application/pdf') {
       const fileBytes = await file.arrayBuffer();
@@ -549,10 +722,10 @@
         // 여러 단어로 쪼개 인식해도(예: "010" "1234" "5678") 패턴을 놓치지 않음
         const lines = buildLinesFromOCR(ret.data.lines);
         for (const line of lines) {
-          maskLine(ctx, line, mapping, mode, isAutoDetectMode, pageNum);
+          collectLineBoxes(line, mapping, maskStyle, isAutoDetectMode, pageNum, allBoxes);
         }
 
-        await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
+        pagesData.push({ pageNum, canvas, width: viewport.width, height: viewport.height, lines });
       }
     } else {
       status.innerText = '이미지 OCR 분석 중...';
@@ -567,17 +740,206 @@
 
       const lines = buildLinesFromOCR(ret.data.lines);
       for (const line of lines) {
-        maskLine(ctx, line, mapping, mode, isAutoDetectMode, 1);
+        collectLineBoxes(line, mapping, maskStyle, isAutoDetectMode, 1, allBoxes);
       }
 
-      await appendCanvasToPdf(newPdfDoc, canvas, img.width, img.height);
+      pagesData.push({ pageNum: 1, canvas, width: img.width, height: img.height, lines });
     }
 
     await worker.terminate();
-    await downloadPdf(newPdfDoc, file.name, mode);
 
     // ⚠️ OCR은 인식 오류로 일부 개인정보를 놓칠 수 있어 육안 확인을 반드시 안내
-    status.innerText += '\n\n⚠️ OCR(문자 인식) 결과는 스캔 품질에 따라 일부 정보가 누락될 수 있습니다. 다운로드된 파일을 열어 육안으로 한 번 더 확인해 주세요.';
+    status.innerText = 'OCR 분석 완료. ⚠️ OCR(문자 인식) 결과는 스캔 품질에 따라 일부 정보가 누락될 수 있습니다 — 아래 검수 영역에서 반드시 육안으로 한 번 더 확인해 주세요.';
+  }
+
+  // ============================================================
+  // 3. HWPX(한글) 문서 분석
+  // HWPX는 사실 zip으로 압축된 XML 문서 묶음입니다(PDF처럼 페이지를 이미지로
+  // "렌더링"하는 표준 방법이 없음). 그래서 PDF/이미지처럼 캔버스에 박스를
+  // 그리는 대신, 문서 안의 실제 텍스트(<•••:t> 요소)를 직접 찾아 값을
+  // 치환하는 방식으로 마스킹합니다. 문단(<•••:p>) 단위로 텍스트를 모아
+  // 검사하며, 문단과 문단 사이에는 개행을 넣어 서로 다른 문단의 글자가
+  // 붙어서 엉뚱하게 매칭되는 것을 최소화합니다.
+  // ============================================================
+  async function processHWPX(file, mapping, maskStyle, isAutoDetectMode) {
+    if (typeof JSZip === 'undefined') {
+      throw new Error('HWPX 처리에 필요한 라이브러리를 불러오지 못했습니다. 네트워크 연결을 확인해주세요.');
+    }
+    const zip = await JSZip.loadAsync(file);
+
+    const sectionPaths = Object.keys(zip.files)
+      .filter(p => /^Contents\/section\d+\.xml$/i.test(p))
+      .sort((a, b) => {
+        const na = parseInt(a.match(/(\d+)/)[1], 10);
+        const nb = parseInt(b.match(/(\d+)/)[1], 10);
+        return na - nb;
+      });
+
+    if (sectionPaths.length === 0) {
+      throw new Error('HWPX 파일에서 본문(section) 데이터를 찾을 수 없습니다. 올바른 .hwpx 파일인지 확인해주세요.');
+    }
+
+    hwpxState = { zip, sections: [] };
+
+    for (let i = 0; i < sectionPaths.length; i++) {
+      const path = sectionPaths[i];
+      const xmlText = await zip.file(path).async('string');
+      const xmlDoc = new DOMParser().parseFromString(xmlText, 'application/xml');
+      if (xmlDoc.getElementsByTagName('parsererror').length) {
+        throw new Error(`HWPX 본문(${path})을 해석하는 데 실패했습니다.`);
+      }
+
+      const { fullText, charMap } = buildHwpxSectionIndex(xmlDoc);
+      hwpxState.sections.push({ path, xmlDoc, fullText, charMap });
+
+      collectHwpxMatches(i, fullText, mapping, maskStyle, isAutoDetectMode, allBoxes);
+    }
+  }
+
+  // 문단(localName === 'p') 단위로 텍스트 요소(localName === 't')를 모아
+  // fullText를 만들고, 각 글자가 어느 요소의 몇 번째 글자였는지 charMap에 기록합니다.
+  // (charMap의 null 항목은 문단 구분을 위해 넣은 개행 문자로, 실제 문서 요소가 없습니다)
+  function buildHwpxSectionIndex(xmlDoc) {
+    const parts = [];
+    const charMap = [];
+    const all = xmlDoc.getElementsByTagName('*');
+    const paragraphs = [];
+    for (let k = 0; k < all.length; k++) {
+      if (all[k].localName === 'p') paragraphs.push(all[k]);
+    }
+
+    const pushTextEl = (el) => {
+      const t = el.textContent || '';
+      for (let ci = 0; ci < t.length; ci++) charMap.push({ node: el, offset: ci });
+      parts.push(t);
+    };
+
+    if (paragraphs.length === 0) {
+      // 문단 구조를 못 찾은 예외적인 경우: 문서 전체에서 텍스트 요소만 순서대로 수집
+      for (let k = 0; k < all.length; k++) {
+        if (all[k].localName === 't') pushTextEl(all[k]);
+      }
+    } else {
+      paragraphs.forEach((p, pIdx) => {
+        const desc = p.getElementsByTagName('*');
+        for (let k = 0; k < desc.length; k++) {
+          if (desc[k].localName === 't') pushTextEl(desc[k]);
+        }
+        if (pIdx < paragraphs.length - 1) {
+          parts.push('\n');
+          charMap.push(null);
+        }
+      });
+    }
+
+    return { fullText: parts.join(''), charMap };
+  }
+
+  // 섹션의 fullText에서 찾은 매치를 allBoxes에 추가(좌표 대신 텍스트 구간 start~end 저장)
+  function collectHwpxMatches(sectionIndex, fullText, mapping, maskStyle, isAutoDetectMode, boxesOut) {
+    const matches = findAllMatches(fullText, mapping, isAutoDetectMode, maskStyle);
+    for (const match of matches) {
+      boxesOut.push({
+        id: boxIdCounter++,
+        page: sectionIndex + 1,
+        type: match.type,
+        original: match.original,
+        code: match.code,
+        maskStyle: maskStyle,
+        manual: false,
+        hwpx: true,
+        sectionIndex,
+        start: match.start,
+        end: match.end,
+        active: true
+      });
+    }
+  }
+
+  // maskStyle에 따라 HWPX 텍스트에 실제로 삽입할 대체 문자열을 만듭니다.
+  // (캔버스가 아니라 텍스트이므로 검은색/회색은 색이 아니라 블록 문자로 표현합니다)
+  function replacementForHwpxBox(box) {
+    const len = Math.max(1, box.original.length);
+    if (box.maskStyle === 'black') return '■'.repeat(len);
+    if (box.maskStyle === 'gray') return '▨'.repeat(len);
+    return box.code; // initial(초성) 또는 code(일련번호) 방식은 이미 계산된 텍스트를 그대로 사용
+  }
+
+  // 한 섹션 안의 활성화된 박스들을 실제 XML 텍스트 요소에 반영(치환)합니다.
+  // 매치 구간이 여러 텍스트 요소에 걸쳐 있으면, 첫 요소에는 대체 텍스트를 넣고
+  // 나머지 요소의 해당 부분은 비워서 마스킹 문구가 중복 표시되지 않게 합니다.
+  function applyHwpxReplacements(section, boxes) {
+    const nodeEdits = new Map();
+    boxes.forEach(box => {
+      const replacement = replacementForHwpxBox(box);
+      const segments = [];
+      let curNode = null, segStart = null, segEnd = null;
+      for (let i = box.start; i < box.end; i++) {
+        const cm = section.charMap[i];
+        if (!cm) continue; // 문단 구분용 개행 등 실제 노드가 없는 위치는 건너뜀
+        if (cm.node !== curNode) {
+          if (curNode) segments.push({ node: curNode, localStart: segStart, localEnd: segEnd });
+          curNode = cm.node; segStart = cm.offset; segEnd = cm.offset + 1;
+        } else {
+          segEnd = cm.offset + 1;
+        }
+      }
+      if (curNode) segments.push({ node: curNode, localStart: segStart, localEnd: segEnd });
+
+      segments.forEach((seg, idx) => {
+        if (!nodeEdits.has(seg.node)) nodeEdits.set(seg.node, []);
+        nodeEdits.get(seg.node).push({ localStart: seg.localStart, localEnd: seg.localEnd, text: idx === 0 ? replacement : '' });
+      });
+    });
+
+    nodeEdits.forEach((edits, node) => {
+      edits.sort((a, b) => b.localStart - a.localStart); // 뒤에서부터 잘라 붙여야 앞쪽 인덱스가 안 밀림
+      let text = node.textContent;
+      for (const e of edits) {
+        text = text.slice(0, e.localStart) + e.text + text.slice(e.localEnd);
+      }
+      node.textContent = text;
+    });
+  }
+
+  // 검수를 마친 HWPX 결과를 실제 문서에 반영하고 .hwpx로 다운로드
+  async function finalizeHwpxDownload() {
+    const status = document.getElementById('status');
+    status.className = 'loading';
+    status.innerText = '검수 결과를 반영해 HWPX 문서에 마스킹을 적용하는 중...';
+
+    try {
+      const bySection = new Map();
+      allBoxes.filter(b => b.hwpx && b.active).forEach(b => {
+        if (!bySection.has(b.sectionIndex)) bySection.set(b.sectionIndex, []);
+        bySection.get(b.sectionIndex).push(b);
+      });
+
+      for (const [sectionIndex, boxes] of bySection.entries()) {
+        const section = hwpxState.sections[sectionIndex];
+        applyHwpxReplacements(section, boxes);
+        const newXml = new XMLSerializer().serializeToString(section.xmlDoc);
+        hwpxState.zip.file(section.path, newXml);
+      }
+
+      const blob = await hwpxState.zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+
+      const prefixMap = { black: '개인정보가림(검정)', gray: '개인정보가림(회색)', initial: '가명화', code: '가명화' };
+      const prefix = prefixMap[currentProcessMode] || '개인정보마스킹';
+      const baseName = currentFileObj.name.replace(/\.hwpx$/i, '');
+      link.download = `${prefix}_${baseName}.hwpx`;
+      link.click();
+
+      const activeCount = allBoxes.filter(b => b.hwpx && b.active).length;
+      status.className = 'success';
+      status.innerText = `최종 다운로드 완료! 검수를 거쳐 총 ${activeCount}건의 개인정보가 [${prefix}] 처리된 HWPX 파일을 받았습니다.`;
+    } catch (err) {
+      console.error(err);
+      status.className = 'error';
+      status.innerText = `HWPX 최종 처리 중 오류 발생: ${err.message}`;
+    }
   }
 
   // ============================================================
@@ -672,7 +1034,18 @@
   }
 
   // 줄 문자열에서 정규식(형식 기반) + 라벨(문맥 기반) 자동탐지, 또는 사용자 지정 이름/상호(수동)를 찾아 매치 목록 반환
-  function findAllMatches(lineText, mapping, isAutoDetectMode, mode) {
+  // maskStyle에 따라 화면/최종본에 표시할 코드(라벨) 문자열을 생성
+  // - black/gray: 실제로는 텍스트 없이 색만 칠하므로 표에 보일 짧은 라벨만 반환
+  // - initial   : 원문 첫 글자만 남기고 나머지는 *
+  // - code      : 문서 전체에서 순번을 매긴 일련번호(P1, P2, ...)
+  function codeForMaskStyle(maskStyle, original) {
+    if (maskStyle === 'black') return '⬛ (가림)';
+    if (maskStyle === 'gray') return '▨ (가림)';
+    if (maskStyle === 'initial') return generateInitialMask(original);
+    return `P${autoCodeCounter++}`; // 'code'
+  }
+
+  function findAllMatches(lineText, mapping, isAutoDetectMode, maskStyle) {
     const matches = [];
     if (isAutoDetectMode) {
       // 1) 형식(정규식) 기반: 주민번호/전화번호/이메일 등 고정된 패턴
@@ -681,7 +1054,7 @@
         let m;
         while ((m = pii.regex.exec(lineText)) !== null) {
           if (m[0].length === 0) { pii.regex.lastIndex++; continue; }
-          matches.push({ start: m.index, end: m.index + m[0].length, type: pii.name, original: m[0], code: '⬛ (완전 가림)' });
+          matches.push({ start: m.index, end: m.index + m[0].length, type: pii.name, original: m[0], code: codeForMaskStyle(maskStyle, m[0]) });
         }
       }
       // 2) 라벨(문맥) 기반: "성명:", "담당자", "연락처", "주소" 등 라벨 뒤의 값만 추정 가림
@@ -697,16 +1070,16 @@
           if (!trimmed) continue;
           const offset = raw.indexOf(trimmed);
           const start = gStart + offset;
-          matches.push({ start, end: start + trimmed.length, type: lp.type, original: trimmed, code: '⬛ (추정 가림)' });
+          matches.push({ start, end: start + trimmed.length, type: lp.type, original: trimmed, code: codeForMaskStyle(maskStyle, trimmed) });
         }
       }
     } else {
+      // 2차 탐지(사용자 지정 이름/업체 목록): 코드는 runSecondDetection에서 이미 계산됨
       for (const item of mapping) {
         if (!item.text) continue;
         let idx = 0;
         while ((idx = lineText.indexOf(item.text, idx)) !== -1) {
-          const code = mode === 'black' ? '⬛ (가림)' : item.code;
-          matches.push({ start: idx, end: idx + item.text.length, type: item.type, original: item.text, code });
+          matches.push({ start: idx, end: idx + item.text.length, type: item.type, original: item.text, code: item.code });
           idx += item.text.length;
         }
       }
@@ -736,43 +1109,51 @@
     return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
   }
 
-  // 계산된 좌표에 실제 마스킹을 그리고 결과를 기록
+  // 좌표 사방에 여유 패딩을 더함
   // (글자폭을 균등분할로 "추정"하는 한계가 있어, 추정 오차로 일부가 덜 가려지는
   //  일이 없도록 사방으로 여유 패딩(pad)을 더해 확실하게 덮습니다)
-  function drawMatchRect(ctx, rect, match, mode, pageNum) {
-    if (!isFinite(rect.x) || !isFinite(rect.y) || rect.width <= 0) return;
-    const pad = 2;
-    const rectX = rect.x - pad;
-    const rectY = rect.y - pad;
-    const rectW = rect.width + pad * 2;
-    const rectH = rect.height + pad * 2;
-
-    if (mode === 'black') {
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(rectX, rectY, rectW, rectH);
-    } else {
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(rectX, rectY, rectW, rectH);
-      const fontSize = Math.max(10, Math.round(rect.height * 0.85));
-      ctx.fillStyle = '#0056b3';
-      ctx.font = `bold ${fontSize}px sans-serif`;
-      ctx.fillText(match.code, rect.x, rect.y + rect.height - (rect.height * 0.15));
-    }
-
-    detectedRecords.push({
-      page: pageNum,
-      type: match.type,
-      original: match.original,
-      result: match.code
-    });
+  function padRect(rect, pad) {
+    return { x: rect.x - pad, y: rect.y - pad, width: rect.width + pad * 2, height: rect.height + pad * 2 };
   }
 
-  // 한 줄(line) 전체에 대해 매칭 + 마스킹을 수행하는 공통 헬퍼
-  function maskLine(ctx, line, mapping, mode, isAutoDetectMode, pageNum) {
-    const matches = findAllMatches(line.text, mapping, isAutoDetectMode, mode);
+  // 실제로는 여기서 캔버스에 바로 그리지 않고, 검수(리뷰) 단계에서 사용자가
+  // 확인·보정할 수 있도록 "박스 정보"만 allBoxes에 쌓아 둡니다.
+  // 실제 마스킹 그리기는 최종 다운로드 시점(renderBoxOnCanvas)에만 수행됩니다.
+  function collectLineBoxes(line, mapping, maskStyle, isAutoDetectMode, pageNum, boxesOut) {
+    const matches = findAllMatches(line.text, mapping, isAutoDetectMode, maskStyle);
     for (const match of matches) {
       const rect = computeMatchRect(line.charMeta, match.start, match.end);
-      drawMatchRect(ctx, rect, match, mode, pageNum);
+      if (!isFinite(rect.x) || !isFinite(rect.y) || rect.width <= 0) continue;
+      const p = padRect(rect, 2);
+      boxesOut.push({
+        id: boxIdCounter++,
+        page: pageNum,
+        type: match.type,
+        original: match.original,
+        code: match.code,
+        maskStyle: maskStyle,
+        manual: false,
+        x: p.x, y: p.y, width: p.width, height: p.height,
+        active: true
+      });
+    }
+  }
+
+  // 박스 하나를 실제 캔버스 컨텍스트에 그림 (최종 다운로드 시에만 호출)
+  function renderBoxOnCanvas(ctx, box) {
+    if (box.maskStyle === 'black') {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(box.x, box.y, box.width, box.height);
+    } else if (box.maskStyle === 'gray') {
+      ctx.fillStyle = '#9ca3af';
+      ctx.fillRect(box.x, box.y, box.width, box.height);
+    } else {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(box.x, box.y, box.width, box.height);
+      const fontSize = Math.max(10, Math.round((box.height - 4) * 0.85));
+      ctx.fillStyle = '#0056b3';
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.fillText(box.code, box.x + 2, box.y + box.height - (box.height * 0.15));
     }
   }
 
@@ -783,19 +1164,215 @@
     newPage.drawImage(pngImage, { x: 0, y: 0, width, height });
   }
 
-  async function downloadPdf(pdfDoc, originalName, mode) {
+  async function downloadPdf(pdfDoc, originalName, maskStyle, count) {
     const status = document.getElementById('status');
     const pdfBytesOutput = await pdfDoc.save();
     const blob = new Blob([pdfBytesOutput], { type: 'application/pdf' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    
-    const prefix = mode === 'black' ? '개인정보가림' : '가명화';
+
+    const prefixMap = { black: '개인정보가림(검정)', gray: '개인정보가림(회색)', initial: '가명화', code: '가명화' };
+    const prefix = prefixMap[maskStyle] || '개인정보마스킹';
     link.download = `${prefix}_${originalName.split('.')[0]}.pdf`;
     link.click();
 
     status.className = 'success';
-    status.innerText = `처리 완료! 총 ${detectedRecords.length}건의 개인정보가 [${prefix}] 처리되었습니다.`;
+    status.innerText = `최종 다운로드 완료! 검수를 거쳐 총 ${count}건의 개인정보가 [${prefix}] 처리되었습니다.`;
+  }
+
+  // ============================================================
+  // 🖼️ 검수(리뷰) UI 렌더링
+  // 페이지별로 "깨끗한" 캔버스를 화면에 보여주고, 그 위에 자동 탐지된
+  // 박스들을 %기반 오버레이로 겹쳐 그립니다. 박스를 클릭하면 포함/제외를
+  // 전환할 수 있고, ×를 누르면 완전히 삭제됩니다. "수동 마스킹 추가"
+  // 모드를 켠 상태로 이미지 위를 드래그하면 새 박스를 직접 추가할 수 있습니다.
+  // ============================================================
+  function renderReviewUI() {
+    const container = document.getElementById('reviewPages');
+    container.innerHTML = '';
+    const manualBtn = document.getElementById('manualModeBtn');
+
+    if (currentFileKind === 'hwpx') {
+      // HWPX는 페이지를 이미지로 렌더링하지 않으므로 박스 미리보기 대신 안내만 표시하고,
+      // 실제 확인/조정은 아래 결과표(체크박스)에서 진행합니다.
+      manualBtn.style.display = 'none';
+      const note = document.createElement('div');
+      note.className = 'help-text';
+      note.style.padding = '10px 4px';
+      note.innerText = 'HWPX 문서는 이미지 미리보기 대신 아래 결과표에서 각 항목(구간·원문·처리 결과)을 확인하고 체크박스로 포함 여부를 조정할 수 있습니다. (드래그로 직접 영역을 지정하는 수동 마스킹은 PDF·이미지 파일에서만 지원됩니다)';
+      container.appendChild(note);
+      return;
+    }
+    manualBtn.style.display = '';
+    container.classList.toggle('manual-mode', manualModeOn);
+
+    pagesData.forEach((page) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'review-page-wrapper';
+
+      const label = document.createElement('div');
+      label.className = 'review-page-label';
+      const boxCountOnPage = allBoxes.filter(b => b.page === page.pageNum).length;
+      label.innerText = `${page.pageNum}페이지 (탐지/추가된 박스 ${boxCountOnPage}개)`;
+      wrapper.appendChild(label);
+
+      const canvasBox = document.createElement('div');
+      canvasBox.className = 'review-canvas-box';
+
+      page.canvas.style.width = '100%';
+      page.canvas.style.height = 'auto';
+      page.canvas.style.display = 'block';
+      canvasBox.appendChild(page.canvas);
+
+      const boxesForPage = allBoxes.filter(b => b.page === page.pageNum);
+      boxesForPage.forEach((box) => {
+        const div = document.createElement('div');
+        div.className = 'mask-box' + (box.manual ? ' manual' : '') + (box.active ? '' : ' inactive');
+        div.style.left = (box.x / page.width * 100) + '%';
+        div.style.top = (box.y / page.height * 100) + '%';
+        div.style.width = (box.width / page.width * 100) + '%';
+        div.style.height = (box.height / page.height * 100) + '%';
+        div.title = `${box.type}: ${box.original} — 클릭하면 ${box.active ? '제외' : '다시 포함'}`;
+        div.onclick = (e) => { e.stopPropagation(); toggleBoxActive(box.id); };
+
+        const delBtn = document.createElement('span');
+        delBtn.className = 'mask-box-del';
+        delBtn.innerText = '×';
+        delBtn.title = '완전히 삭제';
+        delBtn.onclick = (e) => { e.stopPropagation(); deleteBox(box.id); };
+        div.appendChild(delBtn);
+
+        canvasBox.appendChild(div);
+      });
+
+      // 수동 마스킹 추가를 위한 드래그 인터랙션
+      let drawing = false, startX = 0, startY = 0, tempDiv = null;
+      canvasBox.addEventListener('mousedown', (e) => {
+        if (!manualModeOn) return;
+        if (e.target !== canvasBox && e.target !== page.canvas) return; // 기존 박스 위 클릭은 무시
+        const rect = canvasBox.getBoundingClientRect();
+        startX = e.clientX - rect.left;
+        startY = e.clientY - rect.top;
+        drawing = true;
+        tempDiv = document.createElement('div');
+        tempDiv.className = 'manual-drawing';
+        tempDiv.style.left = startX + 'px';
+        tempDiv.style.top = startY + 'px';
+        canvasBox.appendChild(tempDiv);
+      });
+      canvasBox.addEventListener('mousemove', (e) => {
+        if (!drawing || !tempDiv) return;
+        const rect = canvasBox.getBoundingClientRect();
+        const curX = e.clientX - rect.left;
+        const curY = e.clientY - rect.top;
+        const left = Math.min(startX, curX), top = Math.min(startY, curY);
+        const w = Math.abs(curX - startX), h = Math.abs(curY - startY);
+        tempDiv.style.left = left + 'px'; tempDiv.style.top = top + 'px';
+        tempDiv.style.width = w + 'px'; tempDiv.style.height = h + 'px';
+      });
+      const finishDrawing = (e) => {
+        if (!drawing) return;
+        drawing = false;
+        const rect = canvasBox.getBoundingClientRect();
+        const curX = e.clientX - rect.left;
+        const curY = e.clientY - rect.top;
+        const left = Math.min(startX, curX), top = Math.min(startY, curY);
+        const w = Math.abs(curX - startX), h = Math.abs(curY - startY);
+        if (tempDiv) { canvasBox.removeChild(tempDiv); tempDiv = null; }
+        if (w < 6 || h < 6) return; // 너무 작으면 무시(오클릭 방지)
+
+        const scaleX = page.width / rect.width;
+        const scaleY = page.height / rect.height;
+        // 수동 지정 박스는 원문을 알 수 없어 초성/일련번호 같은 텍스트 표기는 만들 수 없으므로,
+        // 현재 선택된 마스킹 방식이 회색이면 회색, 그 외(검은색/초성/일련번호)에는 검은색으로 칠합니다.
+        const manualMaskStyle = currentProcessMode === 'gray' ? 'gray' : 'black';
+        allBoxes.push({
+          id: boxIdCounter++,
+          page: page.pageNum,
+          type: '수동 지정',
+          original: '(사용자 직접 지정)',
+          code: manualMaskStyle === 'gray' ? '▨ (수동 가림)' : '⬛ (수동 가림)',
+          maskStyle: manualMaskStyle,
+          manual: true,
+          x: left * scaleX, y: top * scaleY, width: w * scaleX, height: h * scaleY,
+          active: true
+        });
+        renderReviewUI();
+        renderDetectedRecords();
+      };
+      canvasBox.addEventListener('mouseup', finishDrawing);
+      canvasBox.addEventListener('mouseleave', () => { if (drawing && tempDiv) { canvasBox.removeChild(tempDiv); tempDiv = null; drawing = false; } });
+
+      wrapper.appendChild(canvasBox);
+      container.appendChild(wrapper);
+    });
+  }
+
+  function toggleManualMode() {
+    manualModeOn = !manualModeOn;
+    const btn = document.getElementById('manualModeBtn');
+    btn.classList.toggle('active', manualModeOn);
+    btn.innerText = manualModeOn ? '✏️ 수동 마스킹 추가: 켜짐 (드래그해서 추가)' : '✏️ 수동 마스킹 추가: 꺼짐';
+    document.getElementById('reviewPages').classList.toggle('manual-mode', manualModeOn);
+  }
+
+  function toggleBoxActive(id) {
+    const box = allBoxes.find(b => b.id === id);
+    if (!box) return;
+    box.active = !box.active;
+    renderReviewUI();
+    renderDetectedRecords();
+  }
+
+  function deleteBox(id) {
+    allBoxes = allBoxes.filter(b => b.id !== id);
+    renderReviewUI();
+    renderDetectedRecords();
+  }
+
+  // ============================================================
+  // ✅ 최종 처리: 검수를 마친 뒤 실제로 캔버스에 마스킹을 그려 PDF로 저장
+  // (검수 중인 미리보기 캔버스는 건드리지 않도록 복제본에 그립니다)
+  // ============================================================
+  async function finalizeAndDownload() {
+    if (currentFileKind === 'hwpx') {
+      if (!hwpxState || !currentFileObj) {
+        alert('먼저 파일을 선택하고 자동 탐지를 실행해주세요.');
+        return;
+      }
+      return finalizeHwpxDownload();
+    }
+
+    if (!pagesData.length || !currentFileObj) {
+      alert('먼저 파일을 선택하고 자동 탐지를 실행해주세요.');
+      return;
+    }
+    const status = document.getElementById('status');
+    status.className = 'loading';
+    status.innerText = '검수 결과를 반영해 최종 마스킹을 적용하고 PDF를 생성하는 중...';
+
+    try {
+      const newPdfDoc = await PDFLib.PDFDocument.create();
+      for (const page of pagesData) {
+        const clone = document.createElement('canvas');
+        clone.width = page.canvas.width;
+        clone.height = page.canvas.height;
+        const cctx = clone.getContext('2d');
+        cctx.drawImage(page.canvas, 0, 0);
+
+        const boxesForPage = allBoxes.filter(b => b.page === page.pageNum && b.active);
+        for (const box of boxesForPage) renderBoxOnCanvas(cctx, box);
+
+        await appendCanvasToPdf(newPdfDoc, clone, page.width, page.height);
+      }
+
+      const activeCount = allBoxes.filter(b => b.active).length;
+      await downloadPdf(newPdfDoc, currentFileObj.name, currentProcessMode, activeCount);
+    } catch (err) {
+      console.error(err);
+      status.className = 'error';
+      status.innerText = `최종 처리 중 오류 발생: ${err.message}`;
+    }
   }
 
   function loadImage(file) {
@@ -810,23 +1387,31 @@
     const tbody = document.getElementById('mappingBody');
     tbody.innerHTML = '';
 
-    if (detectedRecords.length === 0) {
+    // 표시 순서: 페이지 → 등록된 순서(id)
+    const sorted = [...allBoxes].sort((a, b) => a.page - b.page || a.id - b.id);
+
+    if (sorted.length === 0) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td colspan="5" style="color:#777;">문서 내에서 가림 처리할 개인정보 또는 지정 단어가 발견되지 않았습니다.</td>`;
+      tr.innerHTML = `<td colspan="7" style="color:#777;">문서 내에서 가림 처리할 개인정보 또는 지정 단어가 발견되지 않았습니다.</td>`;
       tbody.appendChild(tr);
     } else {
-      detectedRecords.forEach((item, index) => {
+      sorted.forEach((item, index) => {
         const tr = document.createElement('tr');
-        const resultHtml = item.result.includes('⬛') 
-          ? `<span style="color:red; font-weight:bold;">${item.result}</span>`
-          : `<span style="color:#0056b3; font-weight:bold;">${item.result}</span>`;
+        if (!item.active) tr.classList.add('row-inactive');
+        const resultHtml = item.code.includes('⬛')
+          ? `<span style="color:#dc2626; font-weight:bold;">${escapeHtml(item.code)}</span>`
+          : item.code.includes('▨')
+          ? `<span style="color:#64748b; font-weight:bold;">${escapeHtml(item.code)}</span>`
+          : `<span style="color:#0056b3; font-weight:bold;">${escapeHtml(item.code)}</span>`;
 
         tr.innerHTML = `
           <td>${index + 1}</td>
           <td><span class="summary-badge">${item.page}페이지</span></td>
-          <td>${item.type}</td>
+          <td>${escapeHtml(item.type)}</td>
           <td style="font-family: monospace; font-weight: bold;">${escapeHtml(item.original)}</td>
           <td>${resultHtml}</td>
+          <td><input type="checkbox" class="row-checkbox" ${item.active ? 'checked' : ''} onchange="toggleBoxActive(${item.id})" title="체크 해제하면 이 항목은 마스킹하지 않습니다"></td>
+          <td><button class="btn-row-del" onclick="deleteBox(${item.id})">삭제</button></td>
         `;
         tbody.appendChild(tr);
       });
@@ -836,20 +1421,22 @@
   }
 
   function exportToExcel() {
-    if (detectedRecords.length === 0) {
+    if (allBoxes.length === 0) {
       alert('다운로드할 내역이 없습니다.');
       return;
     }
 
-    let csvContent = "\uFEFF번호,페이지,탐지 유형,탐지된 원본 텍스트,치환/가림 결과\n";
+    const sorted = [...allBoxes].sort((a, b) => a.page - b.page || a.id - b.id);
+    let csvContent = "\uFEFF번호,페이지,탐지 유형,탐지된 원본 텍스트,치환/가림 결과,최종 포함 여부\n";
 
-    detectedRecords.forEach((item, index) => {
+    sorted.forEach((item, index) => {
       const pageStr = `"${item.page}페이지"`;
       const typeStr = `"${item.type.replace(/"/g, '""')}"`;
       const originalStr = `"${item.original.replace(/"/g, '""')}"`;
-      const resultStr = `"${item.result.replace(/"/g, '""')}"`;
+      const resultStr = `"${item.code.replace(/"/g, '""')}"`;
+      const activeStr = `"${item.active ? '포함(마스킹됨)' : '제외됨'}"`;
 
-      csvContent += `${index + 1},${pageStr},${typeStr},${originalStr},${resultStr}\n`;
+      csvContent += `${index + 1},${pageStr},${typeStr},${originalStr},${resultStr},${activeStr}\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
