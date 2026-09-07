@@ -52,9 +52,12 @@
     .error { color: #dc3545; }
     .loading { color: #007bff; }
 
-    #mappingTable { margin-top: 15px; width: 100%; border-collapse: collapse; }
-    #mappingTable th, #mappingTable td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 13px; }
-    #mappingTable th { background-color: #f8f9fa; color: #333; }
+    /* 건별 상세 결과 표 */
+    .table-container { margin-top: 20px; overflow-x: auto; max-height: 350px; border: 1px solid #ddd; border-radius: 6px; }
+    #mappingTable { width: 100%; border-collapse: collapse; background: #fff; }
+    #mappingTable th, #mappingTable td { border: 1px solid #eee; padding: 10px; text-align: center; font-size: 13px; }
+    #mappingTable th { background-color: #f1f3f5; color: #333; position: sticky; top: 0; z-index: 10; }
+    .summary-badge { display: inline-block; padding: 3px 8px; background: #e7f5ff; color: #1c7ed6; border-radius: 12px; font-weight: bold; font-size: 0.8em; }
   </style>
 </head>
 <body>
@@ -74,7 +77,7 @@
       <ul class="feature-list">
         <li>전자 PDF 및 스캔 사진 문서(OCR) 완벽 지원</li>
         <li>단어 미입력 시 주요 개인정보(주민번호/전화/이메일 등) 자동 탐지 가림</li>
-        <li>지정 단어 선택 마킹 및 일련번호 가명화(A1, B1) 지원</li>
+        <li>탐지 및 가림/가명화 건별 상세 내역(1건 1줄) 실시간 표 제공</li>
       </ul>
     </div>
 
@@ -101,13 +104,13 @@
 
   <div class="input-group">
     <label for="namesInput">인물 이름 목록 (쉼표 구분 - 선택사항):</label>
-    <input type="text" id="namesInput" placeholder="예: 홍길동, 김철수 (비워두면 주민번호/전화번호 등 패턴 자동 가림)">
+    <input type="text" id="namesInput" placeholder="예: 홍길동, 김철수 (비워두면 주민번호/전화번호 등 패턴 자동 탐지)">
     <div class="help-text">가리고 싶은 성명이나 특정 인물 이름을 입력해주세요.</div>
   </div>
 
   <div class="input-group">
     <label for="companiesInput">업체/기관 상호 또는 특정 단어 목록 (쉼표 구분 - 선택사항):</label>
-    <input type="text" id="companiesInput" placeholder="예: (주)ABC, 부여군청 (비워두면 주민번호/전화번호 등 패턴 자동 가림)">
+    <input type="text" id="companiesInput" placeholder="예: (주)ABC, 부여군청 (비워두면 주민번호/전화번호 등 패턴 자동 탐지)">
     <div class="help-text">특정 상호나 가려야 할 추가 단어를 입력해주세요.</div>
   </div>
 
@@ -120,16 +123,21 @@
 
   <div id="status"></div>
 
-  <table id="mappingTable" style="display:none;">
-    <thead>
-      <tr>
-        <th>구분</th>
-        <th>원본 단어 / 패턴</th>
-        <th>치환 결과</th>
-      </tr>
-    </thead>
-    <tbody id="mappingBody"></tbody>
-  </table>
+  <!-- 건별 치환 결과 상세 표 -->
+  <div class="table-container" id="tableContainer" style="display:none;">
+    <table id="mappingTable">
+      <thead>
+        <tr>
+          <th style="width: 10%;">번호</th>
+          <th style="width: 15%;">페이지</th>
+          <th style="width: 20%;">탐지 유형</th>
+          <th style="width: 35%;">탐지된 원본 텍스트/패턴</th>
+          <th style="width: 20%;">치환 / 가림 결과</th>
+        </tr>
+      </thead>
+      <tbody id="mappingBody"></tbody>
+    </table>
+  </div>
 </div>
 
 <script>
@@ -143,6 +151,9 @@
     { name: '사업자등록번호', regex: /\d{3}[-~\s]?\d{2}[-~\s]?\d{5}/g },
     { name: '운전면허번호', regex: /\d{2}[-~\s]?\d{2}[-~\s]?\d{6}[-~\s]?\d{2}/g }
   ];
+
+  // 전체 실행 기록 저장용 배
+  let detectedRecords = [];
 
   function updateFileName(input) {
     const display = document.getElementById('fileNameDisplay');
@@ -190,18 +201,22 @@
       return;
     }
 
+    detectedRecords = []; // 기록 초기화
+    document.getElementById('tableContainer').style.display = 'none';
+    document.getElementById('mappingBody').innerHTML = '';
+
     const mapping = [];
     let aCount = 1, bCount = 1;
 
     if (namesInput.trim()) {
       namesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
-        mapping.push({ text: name, code: mode === 'black' ? '⬛' : `A${aCount++}`, type: '인물' });
+        mapping.push({ text: name, code: mode === 'black' ? '⬛ (가림)' : `A${aCount++}`, type: '인물 이름' });
       });
     }
 
     if (companiesInput.trim()) {
       companiesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(comp => {
-        mapping.push({ text: comp, code: mode === 'black' ? '⬛' : `B${bCount++}`, type: '기타/상호' });
+        mapping.push({ text: comp, code: mode === 'black' ? '⬛ (가림)' : `B${bCount++}`, type: '상호/단어' });
       });
     }
 
@@ -213,13 +228,9 @@
     }
 
     status.className = 'loading';
-    if (isAutoDetectMode) {
-      status.innerText = '입력된 단어가 없어 문서 내 주요 개인정보(주민번호, 전화번호, 이메일 등)를 자동 탐지하여 가림 처리 중...';
-      renderAutoDetectTable();
-    } else {
-      status.innerText = '메모리 상에서 지정한 단어 가림 처리 중...';
-      renderMappingTable(mapping, mode);
-    }
+    status.innerText = isAutoDetectMode 
+      ? '문서 내 주요 개인정보(주민번호, 전화번호, 이메일 등) 탐지 및 가림 처리 중...'
+      : '지정한 단어 분석 및 가림 처리 중...';
 
     try {
       if (docType === 'text') {
@@ -227,6 +238,9 @@
       } else {
         await processOCRDocument(fileInput.files[0], mapping, mode, isAutoDetectMode);
       }
+
+      renderDetectedRecords(); // 작업 완료 후 건별 내역 표 생성
+
     } catch (err) {
       console.error(err);
       status.className = 'error';
@@ -263,7 +277,7 @@
         const width = item.width * viewport.scale;
         const height = item.height * viewport.scale;
 
-        applyMaskToCanvas(ctx, itemText, x, y, width, height, viewport.scale, mapping, mode, isAutoDetectMode);
+        applyMaskAndRecord(ctx, itemText, x, y, width, height, viewport.scale, mapping, mode, isAutoDetectMode, pageNum);
       }
 
       await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
@@ -301,7 +315,7 @@
         
         for (const word of ret.data.words) {
           const { x0, y0, x1, y1 } = word.bbox;
-          applyMaskToCanvas(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAutoDetectMode);
+          applyMaskAndRecord(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAutoDetectMode, pageNum);
         }
 
         await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
@@ -319,7 +333,7 @@
 
       for (const word of ret.data.words) {
         const { x0, y0, x1, y1 } = word.bbox;
-        applyMaskToCanvas(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAutoDetectMode);
+        applyMaskAndRecord(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAutoDetectMode, 1);
       }
 
       await appendCanvasToPdf(newPdfDoc, canvas, img.width, img.height);
@@ -329,43 +343,59 @@
     await downloadPdf(newPdfDoc, file.name, mode);
   }
 
-  // 개인정보 판단 및 마킹 함수
-  function applyMaskToCanvas(ctx, targetText, x, y, width, height, scale, mapping, mode, isAutoDetectMode) {
+  // 가림/치환 실행 및 건별 기록 저장 함수
+  function applyMaskAndRecord(ctx, targetText, x, y, width, height, scale, mapping, mode, isAutoDetectMode, pageNum) {
+    let matchedType = '';
+    let matchedText = '';
+    let resultCode = '';
     let shouldMask = false;
 
     if (isAutoDetectMode) {
-      // 입력 단어가 없을 때: 주요 개인정보 패턴 감지
+      // 패턴 자동 감지
       for (const pii of PII_PATTERNS) {
-        pii.regex.lastIndex = 0; // 정규식 상태 초기화
-        if (pii.regex.test(targetText)) {
+        pii.regex.lastIndex = 0;
+        const match = pii.regex.exec(targetText);
+        if (match) {
           shouldMask = true;
+          matchedType = pii.name;
+          matchedText = match[0]; // 탐지된 실제 문자열
+          resultCode = '⬛ (완전 가림)';
           break;
         }
       }
     } else {
-      // 입력 단어가 있을 때: 해당 단어가 포함되어 있는지 확인
-      mapping.forEach(m => {
+      // 지정 단어 매칭
+      for (const m of mapping) {
         if (targetText.includes(m.text)) {
           shouldMask = true;
+          matchedType = m.type;
+          matchedText = m.text;
+          resultCode = mode === 'black' ? '⬛ (완전 가림)' : m.code;
+          break;
         }
-      });
+      }
     }
 
-    // 마킹 실행
     if (shouldMask) {
+      // 1. 캔버스 마킹 처리
       if (mode === 'black') {
         ctx.fillStyle = '#000000';
         ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
-      } else if (!isAutoDetectMode) {
-        // 일련번호 가명화 모드
-        const matched = mapping.find(m => targetText.includes(m.text));
+      } else {
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
-
         ctx.fillStyle = '#0056b3';
         ctx.font = `bold ${14 * scale}px sans-serif`;
-        ctx.fillText(matched ? matched.code : '⬛', x, y + height - 2);
+        ctx.fillText(resultCode, x, y + height - 2);
       }
+
+      // 2. 건별 기록 배열 추가 (1건당 1개 객체)
+      detectedRecords.push({
+        page: pageNum,
+        type: matchedType,
+        original: matchedText,
+        result: resultCode
+      });
     }
   }
 
@@ -388,7 +418,7 @@
     link.click();
 
     status.className = 'success';
-    status.innerText = `처리 완료! 개인정보가 [${prefix}] 처리된 PDF 파일이 다운로드되었습니다.`;
+    status.innerText = `처리 완료! 총 ${detectedRecords.length}건의 개인정보가 [${prefix}] 처리되었습니다.`;
   }
 
   function loadImage(file) {
@@ -399,31 +429,41 @@
     });
   }
 
-  function renderMappingTable(mapping, mode) {
+  // 건별 1줄씩 표 생성 함수
+  function renderDetectedRecords() {
     const tbody = document.getElementById('mappingBody');
     tbody.innerHTML = '';
 
-    mapping.forEach(m => {
+    if (detectedRecords.length === 0) {
       const tr = document.createElement('tr');
-      const displayCode = mode === 'black' ? '<span style="color:red;">[완전 가림]</span>' : `<strong>${m.code}</strong>`;
-      tr.innerHTML = `<td>${m.type}</td><td>${m.text}</td><td>${displayCode}</td>`;
+      tr.innerHTML = `<td colspan="5" style="color:#777;">문서 내에서 가림 처리할 개인정보 또는 지정 단어가 발견되지 않았습니다.</td>`;
       tbody.appendChild(tr);
-    });
+    } else {
+      detectedRecords.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        
+        // 결과 스타일 지정
+        const resultHtml = item.result.includes('⬛') 
+          ? `<span style="color:red; font-weight:bold;">${item.result}</span>`
+          : `<span style="color:#0056b3; font-weight:bold;">${item.result}</span>`;
 
-    document.getElementById('mappingTable').style.display = 'table';
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td><span class="summary-badge">${item.page}페이지</span></td>
+          <td>${item.type}</td>
+          <td style="font-family: monospace; font-weight: bold;">${escapeHtml(item.original)}</td>
+          <td>${resultHtml}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById('tableContainer').style.display = 'block';
   }
 
-  function renderAutoDetectTable() {
-    const tbody = document.getElementById('mappingBody');
-    tbody.innerHTML = '';
-
-    PII_PATTERNS.forEach(pii => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>자동 감지</td><td>${pii.name} 패턴</td><td><span style="color:red;">[완전 가림]</span></td>`;
-      tbody.appendChild(tr);
-    });
-
-    document.getElementById('mappingTable').style.display = 'table';
+  // HTML 이스케이프 함수
+  function escapeHtml(text) {
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 </script>
 
