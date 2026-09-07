@@ -1,100 +1,225 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PDF 및 이미지 개인정보 자동 가림 도구</title>
-  <!-- CDN 설정 (PDF.js, pdf-lib, Tesseract.js) -->
-  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-  <style>
-    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
-    .container { max-width: 1100px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
-    
-    /* 상단 3분할 그리드 레이아웃 */
-    .top-grid { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 15px; margin-bottom: 20px; }
-    .top-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; background: #fafafa; display: flex; flex-direction: column; justify-content: center; }
-    
-    .top-card h2 { color: #007bff; margin: 0 0 8px 0; font-size: 1.3rem; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
-    .top-card p { margin: 0; font-size: 0.88em; color: #555; line-height: 1.4; }
-    
-    .feature-list { margin: 0; padding-left: 18px; font-size: 0.85em; color: #444; }
-    .feature-list li { margin-bottom: 4px; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF 및 이미지 개인정보 자동 가림 도구</title>
 
-    /* 드래그 앤 드롭 존 */
-    .drop-zone { border: 2px dashed #007bff; border-radius: 8px; padding: 15px; text-align: center; background: #eef5ff; cursor: pointer; transition: background 0.2s; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-    .drop-zone.dragover { background: #d0e3ff; border-color: #0056b3; }
-    .drop-zone p { margin: 5px 0 0 0; font-size: 0.85em; color: #0056b3; font-weight: bold; }
-    .drop-zone input[type="file"] { display: none; }
-    #fileNameDisplay { margin-top: 6px; font-size: 0.8em; color: #28a745; font-weight: bold; word-break: break-all; }
+<!-- 본문용 Pretendard, 제목용 Jua 폰트 (한글병합기와 동일) -->
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
 
-    /* 중간 설정 영역 */
-    .mode-box { background: #fff; border: 1px solid #ced4da; padding: 12px; border-radius: 6px; margin-bottom: 15px; }
-    .input-group { margin-bottom: 12px; }
-    label { font-weight: bold; display: block; margin-bottom: 4px; font-size: 0.9em; }
-    input[type="text"], select { width: 100%; padding: 8px 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
-    .help-text { font-size: 0.8em; color: #666; margin-top: 3px; }
+<!-- PDF.js, pdf-lib, Tesseract.js -->
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
 
-    /* 하단 버튼 그룹 */
-    .btn-group { display: flex; gap: 8px; margin-top: 15px; }
-    .btn-group button { flex: 1; padding: 12px 8px; font-size: 13px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
-    .btn-reset { background: #dc3545; color: white; }
-    .btn-reset:hover { background: #bd2130; }
-    .btn-file { background: #6c757d; color: white; }
-    .btn-file:hover { background: #5a6268; }
-    .btn-black { background: #212529; color: white; }
-    .btn-black:hover { background: #000000; }
-    .btn-pseudo { background: #007bff; color: white; }
-    .btn-pseudo:hover { background: #0056b3; }
+<style>
+  * { box-sizing: border-box; }
 
-    #status { margin-top: 15px; font-weight: bold; text-align: center; white-space: pre-line; font-size: 0.9em; }
-    .success { color: #28a745; }
-    .error { color: #dc3545; }
-    .loading { color: #007bff; }
+  /* 클릭 가능한 요소는 모두 부드럽게 반응하도록 공통 트랜지션 적용 (한글병합기와 동일) */
+  button, .btn-reset, .btn-black, .btn-pseudo, .btn-excel,
+  .top-col-title, .security-banner, .drop-zone, .mode-box, .warning-box, .table-container {
+    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+                box-shadow 0.18s ease, transform 0.12s ease;
+  }
+  button:active { transform: scale(0.96); }
 
-    /* 결과 표 영역 */
-    .table-container { margin-top: 20px; border: 1px solid #ddd; border-radius: 6px; background: #fff; padding: 15px; }
-    .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .table-title { font-weight: bold; font-size: 0.95em; color: #333; }
-    .btn-excel { background: #198754; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 0.82em; cursor: pointer; transition: background 0.2s; }
-    .btn-excel:hover { background: #146c43; }
+  body { font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; background: #f8fafc; margin: 0; padding: 24px; color: #334155; }
 
-    .table-scroll { max-height: 350px; overflow-y: auto; border: 1px solid #eee; }
-    #mappingTable { width: 100%; border-collapse: collapse; }
-    #mappingTable th, #mappingTable td { border: 1px solid #eee; padding: 8px; text-align: center; font-size: 13px; }
-    #mappingTable th { background-color: #f1f3f5; color: #333; position: sticky; top: 0; z-index: 10; }
-    .summary-badge { display: inline-block; padding: 2px 6px; background: #e7f5ff; color: #1c7ed6; border-radius: 10px; font-size: 0.8em; font-weight: bold; }
-  </style>
+  .app-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    animation: app-fade-in 0.4s ease;
+  }
+  @keyframes app-fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .container {
+    width: 100%;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+  }
+
+  /* 상단 3분할 영역 (제목 카드 / 보안 안내 배너 / 드롭존) */
+  .top-section { display: flex; flex-wrap: wrap; align-items: stretch; gap: 14px; margin-bottom: 20px; }
+
+  .top-col-title {
+    flex: 0 0 22%;
+    min-width: 190px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    text-align: center;
+    background: linear-gradient(160deg, #fff7ed 0%, #ffedd5 100%);
+    border: 1px solid #fed7aa; border-radius: 12px; padding: 14px 10px;
+    box-shadow: 0 1px 3px rgba(194,65,12,0.06);
+  }
+  .top-col-title:hover { border-color: #fdba74; box-shadow: 0 6px 16px rgba(194,65,12,0.12); transform: translateY(-1px); }
+  .title-icon { font-size: 2rem; line-height: 1; filter: drop-shadow(0 1px 1px rgba(194,65,12,0.15)); }
+  .title-main { margin: 0; color: #9a3412; font-size: 1.5rem; font-weight: 400; font-family: 'Jua', 'Pretendard Variable', sans-serif; line-height: 1.3; letter-spacing: -0.1px; }
+  .title-security-badge { background: #dcfce7; color: #166534; font-size: 0.78rem; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
+
+  .top-col-guide { flex: 1 1 40%; min-width: 260px; display: flex; }
+  .security-banner {
+    width: 100%;
+    background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%);
+    border: 1px solid #bbf7d0;
+    border-radius: 14px;
+    padding: 14px 16px;
+    color: #166534;
+    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04), 0 1px 2px rgba(16, 24, 40, 0.03);
+  }
+  .security-banner:hover { border-color: #86efac; box-shadow: 0 6px 16px rgba(22,163,74,0.12); transform: translateY(-1px); }
+  .security-banner strong.banner-title { display: block; font-size: 0.95rem; color: #15803d; letter-spacing: -0.2px; margin-bottom: 8px; }
+  .security-banner-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .security-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .security-features li {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(187, 247, 208, 0.7);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 0.78rem;
+  }
+  .security-features .feat-icon {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%;
+    background: #16a34a; color: white; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.25);
+  }
+  .security-features .feat-desc { color: #15803d; font-weight: 700; }
+
+  .top-col-drop { flex: 0 0 30%; min-width: 220px; display: flex; }
+  .drop-zone {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border: 2px dashed #3b82f6; border-radius: 12px; padding: 18px 12px; text-align: center;
+    background-color: #eff6ff; cursor: pointer;
+  }
+  .drop-zone:hover, .drop-zone.dragover { background-color: #dbeafe; border-color: #1d4ed8; }
+  .drop-zone .drop-icon { display: block; font-size: 1.7em; margin-bottom: 6px; }
+  .drop-zone strong { display: block; font-size: 0.9rem; font-weight: 700; line-height: 1.5; color: #1e3a8a; letter-spacing: -0.2px; }
+  .drop-zone span.drop-sub { font-size: 0.75em; color: #60a5fa; margin-top: 4px; display: block; }
+  #fileNameDisplay { margin-top: 8px; font-size: 0.78em; color: #166534; font-weight: 700; word-break: break-all; }
+  input[type="file"] { display: none; }
+
+  /* ⚠️ 자동탐지 한계 안내 배너 */
+  .warning-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(180,83,9,0.05); }
+  .warning-box:hover { border-color: #fcd34d; box-shadow: 0 6px 16px rgba(180,83,9,0.1); transform: translateY(-1px); }
+  .warning-box strong { color: #92400e; font-size: 0.88rem; }
+  .warning-box p { margin: 6px 0 0 0; font-size: 0.8rem; color: #78350f; line-height: 1.55; }
+
+  /* 중간 설정 영역 */
+  .mode-box { background: #fafafa; border: 1px solid #e2e8f0; padding: 16px; border-radius: 12px; margin-bottom: 16px; }
+  .mode-box:hover { border-color: #cbd5e1; }
+  .input-group { margin-bottom: 14px; }
+  label { font-weight: 700; display: block; margin-bottom: 5px; font-size: 0.88em; color: #334155; }
+  input[type="text"], select {
+    width: 100%; padding: 9px 12px; box-sizing: border-box;
+    border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px;
+    font-family: inherit; color: #1e293b; background: white;
+  }
+  input[type="text"]:focus, select:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+  .help-text { font-size: 0.78em; color: #64748b; margin-top: 4px; }
+
+  /* 하단 버튼 그룹 - 부드러운 색상으로 조정 */
+  .btn-group { display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+  .btn-group button { padding: 13px 10px; font-size: 13px; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; font-family: inherit; }
+
+  .btn-reset {
+    padding: 5px 14px;
+    background: white; border: 1.5px solid #ef4444; color: #ef4444; border-radius: 20px;
+    font-size: 0.78rem; font-weight: 700; white-space: nowrap; flex-shrink: 0;
+  }
+  .btn-reset:hover { background: #ef4444; color: white; }
+
+  .btn-black {
+    flex: 1 1 200px;
+    background: #a7f3d0; color: #065f46;
+    box-shadow: 0 2px 6px rgba(16,185,129,0.15);
+  }
+  .btn-black:hover { background: #6ee7b7; transform: translateY(-2px); box-shadow: 0 6px 14px rgba(16,185,129,0.22); }
+
+  .btn-pseudo {
+    flex: 1 1 200px;
+    background: #ddd6fe; color: #5b21b6;
+    box-shadow: 0 2px 6px rgba(139,92,246,0.15);
+  }
+  .btn-pseudo:hover { background: #c4b5fd; transform: translateY(-2px); box-shadow: 0 6px 14px rgba(139,92,246,0.22); }
+
+  #status { margin-top: 16px; font-weight: 700; text-align: center; white-space: pre-line; font-size: 0.9em; }
+  .success { color: #16a34a; }
+  .error { color: #ef4444; }
+  .loading { color: #3b82f6; }
+
+  /* 결과 표 영역 */
+  .table-container { margin-top: 22px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; padding: 16px; }
+  .table-container:hover { border-color: #cbd5e1; }
+  .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .table-title { font-weight: 700; font-size: 0.95em; color: #334155; }
+  .btn-excel { background: #10b981; color: white; border: none; padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 0.82em; cursor: pointer; box-shadow: 0 2px 6px rgba(16,185,129,0.2); }
+  .btn-excel:hover { background: #059669; }
+
+  .table-scroll { max-height: 350px; overflow-y: auto; border: 1px solid #f1f5f9; border-radius: 8px; }
+  #mappingTable { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  #mappingTable th, #mappingTable td { border-bottom: 1px solid #f1f5f9; padding: 9px 8px; text-align: center; }
+  #mappingTable th { background-color: #f8fafc; color: #64748b; font-weight: 600; position: sticky; top: 0; z-index: 10; }
+  #mappingTable tr:hover td { background: #f8fafc; }
+  .summary-badge { display: inline-block; padding: 2px 8px; background: #eff6ff; color: #1d4ed8; border-radius: 10px; font-size: 0.8em; font-weight: 700; }
+
+  @media (max-width: 900px) {
+    .top-section { flex-direction: column; }
+    .top-col-title, .top-col-guide, .top-col-drop { flex-basis: auto; width: 100%; }
+  }
+</style>
 </head>
 <body>
 
+<div class="app-container">
 <div class="container">
   <!-- 상단 3분할 영역 -->
-  <div class="top-grid">
-    <div class="top-card">
-      <h2>PDF 개인정보 가림 도구</h2>
-      <p>서버 전송 없이 <strong>100% 브라우저 메모리(RAM)</strong>에서 처리되며, 복구 불가능한 보안 파일로 생성됩니다.</p>
+  <div class="top-section">
+    <div class="top-col-title">
+      <div class="title-icon">🔒</div>
+      <h2 class="title-main">PDF·이미지<br>개인정보 마스킹</h2>
+      <span class="title-security-badge">🔒 100% 브라우저 로컬 처리</span>
     </div>
 
-    <div class="top-card">
-      <strong style="margin-bottom:6px; font-size:0.9em; color:#007bff;">주요 특징</strong>
-      <ul class="feature-list">
-        <li>정밀 위치 계산으로 해당 단어만 정확히 치환</li>
-        <li>첫 글자 유지 가명화(홍**) 또는 일련번호(A1) 선택 가능</li>
-        <li>기존 글자 크기 자동 유지 및 엑셀 결과 다운로드</li>
-      </ul>
+    <div class="top-col-guide">
+      <div class="security-banner">
+        <div class="security-banner-header">
+          <strong class="banner-title" style="margin-bottom:0;">🔒 개인정보 보안 100% 보장</strong>
+          <button class="btn-reset" onclick="resetAll()">🔄 초기화</button>
+        </div>
+        <ul class="security-features">
+          <li><span class="feat-icon">🌐</span><span><strong>외부 서버 전송 ZERO</strong> <span class="feat-desc">: 파일이 브라우저 안에서만 처리</span></span></li>
+          <li><span class="feat-icon">🖼️</span><span><strong>원본 텍스트 완전 제거</strong> <span class="feat-desc">: 이미지로 재구성해 복사·추출 불가</span></span></li>
+          <li><span class="feat-icon">🎯</span><span><strong>정밀 위치 자동 가림</strong> <span class="feat-desc">: 줄 단위로 분석해 정확한 위치만 처리</span></span></li>
+        </ul>
+      </div>
     </div>
 
-    <div class="top-card" style="padding:0; border:none; background:none;">
+    <div class="top-col-drop">
       <div class="drop-zone" id="dropZone" onclick="document.getElementById('pdfFile').click()">
-        <span style="font-size: 1.8em;">📁</span>
-        <p>클릭하여 파일 선택 또는 파일 드래그 앤 드롭</p>
-        <span style="font-size:0.75em; color:#888;">(PDF, JPG, PNG 파일 가능)</span>
+        <span class="drop-icon">📁</span>
+        <strong>클릭하여 파일 선택<br>또는 드래그 앤 드롭</strong>
+        <span class="drop-sub">(PDF, JPG, PNG 파일 가능)</span>
         <div id="fileNameDisplay">선택된 파일 없음</div>
         <input type="file" id="pdfFile" accept="application/pdf, image/png, image/jpeg" onchange="updateFileName(this)">
       </div>
     </div>
+  </div>
+
+  <!-- 자동 탐지 한계 안내 -->
+  <div class="warning-box">
+    <strong>⚠️ 자동 탐지는 "패턴"만 잡습니다</strong>
+    <p>
+      이름/상호 입력란을 비워두면 주민등록번호·전화번호·이메일·사업자등록번호·운전면허번호·여권번호·신용카드번호 형식만 자동으로 가려집니다.
+      <strong>사람 이름, 주소, 계좌번호, 생년월일은 형식이 워낙 다양해 정규식으로 자동 탐지되지 않으므로</strong>,
+      가리고 싶은 이름·주소·계좌번호 등이 있다면 반드시 아래 입력란에 직접 입력해 주세요.
+    </p>
   </div>
 
   <!-- 설정 영역 -->
@@ -119,22 +244,20 @@
 
   <div class="input-group">
     <label for="namesInput">인물 이름 목록 (쉼표 구분 - 선택사항):</label>
-    <input type="text" id="namesInput" placeholder="예: 홍길동, 김철수 (비워두면 주민번호/전화번호 등 패턴 자동 탐지)">
-    <div class="help-text">가리고 싶은 성명이나 특정 인물 이름을 입력해주세요.</div>
+    <input type="text" id="namesInput" placeholder="예: 홍길동, 김철수 (자동 탐지되지 않으므로 가릴 이름은 직접 입력)">
+    <div class="help-text">가리고 싶은 성명이나 특정 인물 이름을 입력해주세요. (이름은 자동 탐지되지 않습니다)</div>
   </div>
 
   <div class="input-group">
-    <label for="companiesInput">업체/기관 상호 또는 특정 단어 목록 (쉼표 구분 - 선택사항):</label>
-    <input type="text" id="companiesInput" placeholder="예: (주)ABC, 부여군청 (비워두면 주민번호/전화번호 등 패턴 자동 탐지)">
-    <div class="help-text">특정 상호나 가려야 할 추가 단어를 입력해주세요.</div>
+    <label for="companiesInput">업체/기관 상호, 주소, 계좌번호 등 특정 단어 목록 (쉼표 구분 - 선택사항):</label>
+    <input type="text" id="companiesInput" placeholder="예: (주)ABC, 부여군청, 충남 부여군 ○○로 12 (자동 탐지 안 되는 항목은 직접 입력)">
+    <div class="help-text">특정 상호·주소·계좌번호 등 가려야 할 추가 단어를 입력해주세요.</div>
   </div>
 
   <!-- 버튼 그룹 -->
   <div class="btn-group">
-    <button class="btn-reset" onclick="resetAll()">🔄 초기화</button>
-    <button class="btn-file" onclick="document.getElementById('pdfFile').click()">📂 파일 다시 선택</button>
-    <button class="btn-black" onclick="processDocument('black')">⬛ 2. 완전 가림 (개인정보)</button>
-    <button class="btn-pseudo" onclick="processDocument('pseudo')">🏷️ 3. 가명화 처리</button>
+    <button class="btn-black" onclick="processDocument('black')">⬛ 완전 가림 (개인정보)</button>
+    <button class="btn-pseudo" onclick="processDocument('pseudo')">🏷️ 가명화 처리</button>
   </div>
 
   <div id="status"></div>
@@ -161,16 +284,24 @@
     </div>
   </div>
 </div>
+</div>
 
 <script>
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
 
+  // 참고: 아래 패턴들은 겹쳐서 매칭될 수 있으나(예: 신용카드번호↔전화번호 일부),
+  // 개인정보 마스킹 도구 특성상 "과다 가림"이 "누락"보다 안전하므로 겹침은 허용합니다.
+  // 계좌번호/생년월일/주소는 은행·표기 방식이 매우 다양해 일반 정규식으로는 오탐이 커서
+  // 넣지 않았습니다 — 필요 시 아래 "인물 이름 / 상호·특정단어" 입력란에 직접 추가해 주세요.
   const PII_PATTERNS = [
     { name: '주민등록번호', regex: /\d{6}[-~\s]?[1-4]\d{6}/g },
+    { name: '외국인등록번호', regex: /\d{6}[-~\s]?[5-8]\d{6}/g },
     { name: '전화번호', regex: /(01[016789]|02|0[3-9][0-9])[-~\s]?\d{3,4}[-~\s]?\d{4}/g },
     { name: '이메일', regex: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g },
     { name: '사업자등록번호', regex: /\d{3}[-~\s]?\d{2}[-~\s]?\d{5}/g },
-    { name: '운전면허번호', regex: /\d{2}[-~\s]?\d{2}[-~\s]?\d{6}[-~\s]?\d{2}/g }
+    { name: '운전면허번호', regex: /\d{2}[-~\s]?\d{2}[-~\s]?\d{6}[-~\s]?\d{2}/g },
+    { name: '여권번호', regex: /[A-Z]\d{8}/g },
+    { name: '신용카드번호', regex: /\d{4}[-~\s]?\d{4}[-~\s]?\d{4}[-~\s]?\d{4}/g }
   ];
 
   let detectedRecords = [];
@@ -313,7 +444,8 @@
 
       await page.render({ canvasContext: ctx, viewport: viewport }).promise;
       const textContent = await page.getTextContent();
-      
+
+      const items = [];
       for (const item of textContent.items) {
         const itemText = item.str;
         if (!itemText || !itemText.trim()) continue;
@@ -324,7 +456,13 @@
         const fullWidth = item.width * viewport.scale;
         const fullHeight = item.height * viewport.scale;
 
-        applyPreciseMask(ctx, itemText, fullX, fullY, fullWidth, fullHeight, mapping, mode, isAutoDetectMode, pageNum);
+        items.push({ str: itemText, x: fullX, y: fullY, width: fullWidth, height: fullHeight });
+      }
+
+      // 🔧 같은 줄의 조각들을 병합한 뒤 매칭 → 조각 경계에 걸친 패턴도 탐지
+      const lines = buildLines(items);
+      for (const line of lines) {
+        maskLine(ctx, line, mapping, mode, isAutoDetectMode, pageNum);
       }
 
       await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
@@ -359,10 +497,12 @@
         await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
         const ret = await worker.recognize(canvas);
-        
-        for (const word of ret.data.words) {
-          const { x0, y0, x1, y1 } = word.bbox;
-          applyPreciseMask(ctx, word.text, x0, y0, x1 - x0, y1 - y0, mapping, mode, isAutoDetectMode, pageNum);
+
+        // 🔧 단어 하나씩이 아니라 "줄" 단위로 합쳐서 매칭 → OCR이 번호를
+        // 여러 단어로 쪼개 인식해도(예: "010" "1234" "5678") 패턴을 놓치지 않음
+        const lines = buildLinesFromOCR(ret.data.lines);
+        for (const line of lines) {
+          maskLine(ctx, line, mapping, mode, isAutoDetectMode, pageNum);
         }
 
         await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
@@ -378,9 +518,9 @@
 
       const ret = await worker.recognize(canvas);
 
-      for (const word of ret.data.words) {
-        const { x0, y0, x1, y1 } = word.bbox;
-        applyPreciseMask(ctx, word.text, x0, y0, x1 - x0, y1 - y0, mapping, mode, isAutoDetectMode, 1);
+      const lines = buildLinesFromOCR(ret.data.lines);
+      for (const line of lines) {
+        maskLine(ctx, line, mapping, mode, isAutoDetectMode, 1);
       }
 
       await appendCanvasToPdf(newPdfDoc, canvas, img.width, img.height);
@@ -388,62 +528,188 @@
 
     await worker.terminate();
     await downloadPdf(newPdfDoc, file.name, mode);
+
+    // ⚠️ OCR은 인식 오류로 일부 개인정보를 놓칠 수 있어 육안 확인을 반드시 안내
+    status.innerText += '\n\n⚠️ OCR(문자 인식) 결과는 스캔 품질에 따라 일부 정보가 누락될 수 있습니다. 다운로드된 파일을 열어 육안으로 한 번 더 확인해 주세요.';
   }
 
-  // 🎯 문장 내에서 타겟 단어 위치를 정확하게 계산하여 부분 치환하는 함수
-  function applyPreciseMask(ctx, fullText, x, y, width, height, mapping, mode, isAutoDetectMode, pageNum) {
+  // ============================================================
+  // 🔧 줄(line) 단위 텍스트 병합 + 매칭 로직
+  // 기존 방식은 PDF 텍스트 아이템 / OCR 단어 "한 조각" 안에서만 정규식을
+  // 매칭했기 때문에, 예를 들어 "010-1234-5678"이 폰트/OCR 인식 특성상
+  // "010-1234-"와 "5678" 두 조각으로 나뉘어 추출되면 어느 조각에도 완전한
+  // 패턴이 없어 가림 처리가 되지 않고 그대로 노출되는 문제가 있었습니다.
+  // 아래 함수들은 같은 줄(y좌표가 비슷한)에 속한 조각들을 하나의 문자열로
+  // 합친 뒤 매칭하고, 매칭된 글자들이 실제로 어느 조각의 어느 위치에
+  // 있었는지(charMeta)를 되짚어 정확한 좌표에 마스킹을 그립니다.
+  // ============================================================
+
+  // PDF 텍스트 아이템들을 같은 줄끼리 묶고, 줄 문자열 + 글자별 좌표(charMeta)를 생성
+  function buildLines(items) {
+    const validItems = items.filter(it => it.str && it.str.length > 0);
+    const sorted = [...validItems].sort((a, b) => a.y - b.y);
+
+    const clusters = [];
+    for (const item of sorted) {
+      let target = null;
+      for (const c of clusters) {
+        const tol = Math.max(c.refHeight, item.height) * 0.6;
+        if (Math.abs(item.y - c.refY) <= tol) { target = c; break; }
+      }
+      if (target) {
+        target.items.push(item);
+      } else {
+        clusters.push({ refY: item.y, refHeight: item.height, items: [item] });
+      }
+    }
+
+    const lines = [];
+    for (const cluster of clusters) {
+      const lineItems = cluster.items.slice().sort((a, b) => a.x - b.x);
+      let text = '';
+      const charMeta = [];
+      let prevRight = null;
+      for (const item of lineItems) {
+        const len = Math.max(item.str.length, 1);
+        const cw = item.width / len;
+        // 조각 사이에 실제로 벌어진 간격이 있으면 공백 한 칸으로 채워
+        // (패턴의 [-~\s]? 구간과 자연스럽게 이어지도록) 매칭이 끊기지 않게 함
+        if (prevRight !== null) {
+          const gap = item.x - prevRight;
+          if (gap > cw * 0.6 && gap > 1) {
+            text += ' ';
+            charMeta.push({ x: prevRight, y: item.y, w: gap, h: item.height });
+          }
+        }
+        for (let i = 0; i < item.str.length; i++) {
+          text += item.str[i];
+          charMeta.push({ x: item.x + i * cw, y: item.y, w: cw, h: item.height });
+        }
+        prevRight = item.x + item.width;
+      }
+      lines.push({ text, charMeta });
+    }
+    return lines;
+  }
+
+  // Tesseract OCR 결과(줄 단위)를 동일한 형태(text + charMeta)로 변환
+  function buildLinesFromOCR(ocrLines) {
+    const lines = [];
+    for (const line of (ocrLines || [])) {
+      if (!line.words || line.words.length === 0) continue;
+      let text = '';
+      const charMeta = [];
+      line.words.forEach((word, idx) => {
+        if (!word.text) return;
+        if (idx > 0) {
+          const prevWord = line.words[idx - 1];
+          text += ' ';
+          charMeta.push({
+            x: prevWord.bbox.x1, y: prevWord.bbox.y0,
+            w: Math.max(word.bbox.x0 - prevWord.bbox.x1, 1),
+            h: prevWord.bbox.y1 - prevWord.bbox.y0
+          });
+        }
+        const { x0, y0, x1, y1 } = word.bbox;
+        const w = x1 - x0, h = y1 - y0;
+        const len = Math.max(word.text.length, 1);
+        const cw = w / len;
+        for (let i = 0; i < word.text.length; i++) {
+          text += word.text[i];
+          charMeta.push({ x: x0 + i * cw, y: y0, w: cw, h: h });
+        }
+      });
+      lines.push({ text, charMeta });
+    }
+    return lines;
+  }
+
+  // 줄 문자열에서 정규식(자동탐지) 또는 사용자 지정 이름/상호(수동)를 찾아 매치 목록 반환
+  function findAllMatches(lineText, mapping, isAutoDetectMode, mode) {
+    const matches = [];
     if (isAutoDetectMode) {
       for (const pii of PII_PATTERNS) {
         pii.regex.lastIndex = 0;
-        let match;
-        while ((match = pii.regex.exec(fullText)) !== null) {
-          const targetStr = match[0];
-          const startIndex = match.index;
-          
-          drawSubMask(ctx, fullText, targetStr, startIndex, x, y, width, height, pii.name, '⬛ (완전 가림)', 'black', pageNum);
+        let m;
+        while ((m = pii.regex.exec(lineText)) !== null) {
+          if (m[0].length === 0) { pii.regex.lastIndex++; continue; }
+          matches.push({ start: m.index, end: m.index + m[0].length, type: pii.name, original: m[0], code: '⬛ (완전 가림)' });
         }
       }
     } else {
-      for (const m of mapping) {
-        let startIndex = 0;
-        while ((startIndex = fullText.indexOf(m.text, startIndex)) !== -1) {
-          const targetStr = m.text;
-          const resultCode = mode === 'black' ? '⬛ (완전 가림)' : m.code;
-
-          drawSubMask(ctx, fullText, targetStr, startIndex, x, y, width, height, m.type, resultCode, mode, pageNum);
-          startIndex += m.text.length;
+      for (const item of mapping) {
+        if (!item.text) continue;
+        let idx = 0;
+        while ((idx = lineText.indexOf(item.text, idx)) !== -1) {
+          const code = mode === 'black' ? '⬛ (가림)' : item.code;
+          matches.push({ start: idx, end: idx + item.text.length, type: item.type, original: item.text, code });
+          idx += item.text.length;
         }
       }
     }
+    // 여러 패턴이 같은 구간을 중복으로 잡는 경우 정리(겹치면 먼저 것만 유지)
+    matches.sort((a, b) => a.start - b.start || b.end - a.end);
+    const merged = [];
+    for (const m of matches) {
+      const last = merged[merged.length - 1];
+      if (last && m.start < last.end) continue;
+      merged.push(m);
+    }
+    return merged;
   }
 
-  // 부분 영역 캔버스 그리기 및 기록
-  function drawSubMask(ctx, fullText, targetStr, startIndex, x, y, width, height, type, resultCode, mode, pageNum) {
-    const charWidth = width / fullText.length;
-    const targetX = x + (startIndex * charWidth);
-    const targetWidth = Math.max(targetStr.length * charWidth, 12);
+  // 매치 구간(start~end)에 해당하는 실제 좌표 범위를 charMeta에서 계산
+  function computeMatchRect(charMeta, start, end) {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (let i = start; i < end; i++) {
+      const c = charMeta[i];
+      if (!c) continue;
+      x0 = Math.min(x0, c.x);
+      x1 = Math.max(x1, c.x + c.w);
+      y0 = Math.min(y0, c.y);
+      y1 = Math.max(y1, c.y + c.h);
+    }
+    return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+  }
+
+  // 계산된 좌표에 실제 마스킹을 그리고 결과를 기록
+  // (글자폭을 균등분할로 "추정"하는 한계가 있어, 추정 오차로 일부가 덜 가려지는
+  //  일이 없도록 사방으로 여유 패딩(pad)을 더해 확실하게 덮습니다)
+  function drawMatchRect(ctx, rect, match, mode, pageNum) {
+    if (!isFinite(rect.x) || !isFinite(rect.y) || rect.width <= 0) return;
+    const pad = 2;
+    const rectX = rect.x - pad;
+    const rectY = rect.y - pad;
+    const rectW = rect.width + pad * 2;
+    const rectH = rect.height + pad * 2;
 
     if (mode === 'black') {
       ctx.fillStyle = '#000000';
-      ctx.fillRect(targetX - 1, y - 1, targetWidth + 2, height + 2);
+      ctx.fillRect(rectX, rectY, rectW, rectH);
     } else {
-      // 해당 단어 부분만 흰색으로 지우기
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(targetX - 1, y - 1, targetWidth + 2, height + 2);
-
-      // 기존 글자 크기(height) 반영하여 치환 텍스트 입력
-      const fontSize = Math.max(10, Math.round(height * 0.85));
+      ctx.fillRect(rectX, rectY, rectW, rectH);
+      const fontSize = Math.max(10, Math.round(rect.height * 0.85));
       ctx.fillStyle = '#0056b3';
       ctx.font = `bold ${fontSize}px sans-serif`;
-      ctx.fillText(resultCode, targetX, y + height - (height * 0.15));
+      ctx.fillText(match.code, rect.x, rect.y + rect.height - (rect.height * 0.15));
     }
 
     detectedRecords.push({
       page: pageNum,
-      type: type,
-      original: targetStr,
-      result: resultCode
+      type: match.type,
+      original: match.original,
+      result: match.code
     });
+  }
+
+  // 한 줄(line) 전체에 대해 매칭 + 마스킹을 수행하는 공통 헬퍼
+  function maskLine(ctx, line, mapping, mode, isAutoDetectMode, pageNum) {
+    const matches = findAllMatches(line.text, mapping, isAutoDetectMode, mode);
+    for (const match of matches) {
+      const rect = computeMatchRect(line.charMeta, match.start, match.end);
+      drawMatchRect(ctx, rect, match, mode, pageNum);
+    }
   }
 
   async function appendCanvasToPdf(pdfDoc, canvas, width, height) {
@@ -537,6 +803,5 @@
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 </script>
-
 </body>
 </html>
