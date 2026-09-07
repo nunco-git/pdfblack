@@ -3,62 +3,119 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PDF 메모리 기반 개인정보 처리 도구</title>
-  <!-- 로딩 안정성이 높은 CDN으로 교체 -->
+  <title>PDF 및 이미지 개인정보 처리 도구</title>
+  <!-- CDN 설정 (PDF.js, pdf-lib, Tesseract.js) -->
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
   <style>
-    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 30px; background-color: #f4f7f6; color: #333; }
-    .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
-    h2 { border-bottom: 2px solid #007bff; padding-bottom: 10px; color: #007bff; margin-top: 0; }
-    .input-group { margin-bottom: 18px; }
-    label { font-weight: bold; display: block; margin-bottom: 6px; }
-    input[type="text"], input[type="file"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
-    .help-text { font-size: 0.85em; color: #666; margin-top: 4px; }
+    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; background-color: #f4f7f6; color: #333; }
+    .container { max-width: 1100px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
     
-    .btn-group { display: flex; gap: 10px; margin-top: 20px; }
-    button { flex: 1; padding: 14px; font-size: 15px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+    /* 상단 3분할 그리드 레이아웃 */
+    .top-grid { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 15px; margin-bottom: 20px; }
+    .top-card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 15px; background: #fafafa; display: flex; flex-direction: column; justify-content: center; }
+    
+    .top-card h2 { color: #007bff; margin: 0 0 8px 0; font-size: 1.3rem; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+    .top-card p { margin: 0; font-size: 0.88em; color: #555; line-height: 1.4; }
+    
+    /* 특징 영역 리스트 */
+    .feature-list { margin: 0; padding-left: 18px; font-size: 0.85em; color: #444; }
+    .feature-list li { margin-bottom: 4px; }
+
+    /* 드래그 앤 드롭 존 */
+    .drop-zone { border: 2px dashed #007bff; border-radius: 8px; padding: 15px; text-align: center; background: #eef5ff; cursor: pointer; transition: background 0.2s; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+    .drop-zone.dragover { background: #d0e3ff; border-color: #0056b3; }
+    .drop-zone p { margin: 5px 0 0 0; font-size: 0.85em; color: #0056b3; font-weight: bold; }
+    .drop-zone input[type="file"] { display: none; }
+    #fileNameDisplay { margin-top: 6px; font-size: 0.8em; color: #28a745; font-weight: bold; word-break: break-all; }
+
+    /* 중간 설정 영역 */
+    .mode-box { background: #fff; border: 1px solid #ced4da; padding: 12px; border-radius: 6px; margin-bottom: 15px; }
+    .input-group { margin-bottom: 12px; }
+    label { font-weight: bold; display: block; margin-bottom: 4px; font-size: 0.9em; }
+    input[type="text"], select { width: 100%; padding: 8px 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
+    .help-text { font-size: 0.8em; color: #666; margin-top: 3px; }
+
+    /* 하단 버튼 3개 나란히 배치 */
+    .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+    .btn-group button { flex: 1; padding: 12px; font-size: 14px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+    .btn-file { background: #6c757d; color: white; }
+    .btn-file:hover { background: #5a6268; }
     .btn-black { background: #212529; color: white; }
     .btn-black:hover { background: #000000; }
     .btn-pseudo { background: #007bff; color: white; }
     .btn-pseudo:hover { background: #0056b3; }
-    
-    #status { margin-top: 20px; font-weight: bold; text-align: center; white-space: pre-line; }
+
+    #status { margin-top: 15px; font-weight: bold; text-align: center; white-space: pre-line; font-size: 0.9em; }
     .success { color: #28a745; }
     .error { color: #dc3545; }
     .loading { color: #007bff; }
-    
-    #mappingTable { margin-top: 20px; width: 100%; border-collapse: collapse; }
-    #mappingTable th, #mappingTable td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 14px; }
+
+    #mappingTable { margin-top: 15px; width: 100%; border-collapse: collapse; }
+    #mappingTable th, #mappingTable td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 13px; }
     #mappingTable th { background-color: #f8f9fa; color: #333; }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <h2>PDF 메모리 개인정보 처리 웹앱</h2>
-  <p style="font-size: 0.9em; color: #555;">서버 전송 없이 <strong>100% 브라우저 메모리(RAM)</strong>에서 처리되며, 이미지 PDF로 재조합되어 원본 복구가 불가능합니다.</p>
-  
-  <div class="input-group">
-    <label for="pdfFile">1. PDF 파일 선택:</label>
-    <input type="file" id="pdfFile" accept="application/pdf">
+  <!-- 상단 3분할 영역 -->
+  <div class="top-grid">
+    <!-- 1. 제목 영역 -->
+    <div class="top-card">
+      <h2>PDF 개인정보 가림 도구</h2>
+      <p>서버 전송 없이 <strong>100% 브라우저 메모리(RAM)</strong>에서 처리되며, 복구 불가능한 파일로 재조합됩니다.</p>
+    </div>
+
+    <!-- 2. 특징 영역 -->
+    <div class="top-card">
+      <strong style="margin-bottom:6px; font-size:0.9em; color:#007bff;">주요 특징</strong>
+      <ul class="feature-list">
+        <li>전자 PDF 및 스캔 사진 문서(OCR) 완벽 지원</li>
+        <li>특정 단어 가림 및 일련번호 가명화(A1, B1)</li>
+        <li>단어 미입력 시 전체 영역 블라인드 가림</li>
+      </ul>
+    </div>
+
+    <!-- 3. 드래그 앤 드롭 존 -->
+    <div class="top-card" style="padding:0; border:none; background:none;">
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('pdfFile').click()">
+        <span style="font-size: 1.8em;">📁</span>
+        <p>클릭하여 파일 선택 또는 파일 드래그 앤 드롭</p>
+        <span style="font-size:0.75em; color:#888;">(PDF, JPG, PNG 파일 가능)</span>
+        <div id="fileNameDisplay">선택된 파일 없음</div>
+        <input type="file" id="pdfFile" accept="application/pdf, image/png, image/jpeg" onchange="updateFileName(this)">
+      </div>
+    </div>
+  </div>
+
+  <!-- 입력 및 설정 영역 -->
+  <div class="mode-box">
+    <label for="docType">📄 문서 유형 선택:</label>
+    <select id="docType">
+      <option value="text">일반 PDF (텍스트 검색/복사 가능한 전자문서 - 초고속)</option>
+      <option value="ocr">스캔본 PDF / 종이 사진 문서 (OCR 문자 인식 사용 - 수 초 소요)</option>
+    </select>
   </div>
 
   <div class="input-group">
-    <label for="namesInput">2. 인물 이름 목록 (쉼표 구분):</label>
+    <label for="namesInput">인물 이름 목록 (쉼표 구분):</label>
     <input type="text" id="namesInput" placeholder="예: 홍길동, 김철수, 이영희">
-    <div class="help-text">마킹 처리 시 검게 가려지며, 일련번호 처리 시 A1, A2... 로 변환됩니다.</div>
+    <div class="help-text">입력 시 해당 단어만 가려지며, 비워둘 경우 선택된 모드에 따라 처리됩니다.</div>
   </div>
 
   <div class="input-group">
-    <label for="companiesInput">3. 업체/기관 상호 목록 (쉼표 구분):</label>
+    <label for="companiesInput">업체/기관 상호 목록 (쉼표 구분):</label>
     <input type="text" id="companiesInput" placeholder="예: (주)ABC, 부여군청, 현대자동차">
-    <div class="help-text">마킹 처리 시 검게 가려지며, 일련번호 처리 시 B1, B2... 로 변환됩니다.</div>
+    <div class="help-text">입력 시 해당 단어만 가려지며, 비워둘 경우 선택된 모드에 따라 처리됩니다.</div>
   </div>
 
+  <!-- 하단 버튼 3개 나란히 배치 -->
   <div class="btn-group">
-    <button class="btn-black" onclick="processPDF('black')">⬛ 완전 가림(검은 마킹)</button>
-    <button class="btn-pseudo" onclick="processPDF('pseudo')">🏷️ 일련번호 가명화 (A1, B1)</button>
+    <button class="btn-file" onclick="document.getElementById('pdfFile').click()">1. 파일 다시 선택</button>
+    <button class="btn-black" onclick="processDocument('black')">2. ⬛ 완전 가림 (검은 마킹)</button>
+    <button class="btn-pseudo" onclick="processDocument('pseudo')">3. 🏷️ 일련번호 가명화 (A1, B1)</button>
   </div>
 
   <div id="status"></div>
@@ -76,10 +133,46 @@
 </div>
 
 <script>
-  // GitHub Pages CORS 에러 방지: 워커 인라인 설정
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
 
-  async function processPDF(mode) {
+  // 파일 선택 표시 업데이트
+  function updateFileName(input) {
+    const display = document.getElementById('fileNameDisplay');
+    if (input.files && input.files[0]) {
+      display.innerText = `선택됨: ${input.files[0].name}`;
+    } else {
+      display.innerText = '선택된 파일 없음';
+    }
+  }
+
+  // 드래그 앤 드롭 이벤트 처리
+  const dropZone = document.getElementById('dropZone');
+  ['dragenter', 'dragover'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    }, false);
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+    }, false);
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    if (files && files.length > 0) {
+      const fileInput = document.getElementById('pdfFile');
+      fileInput.files = files;
+      updateFileName(fileInput);
+    }
+  });
+
+  async function processDocument(mode) {
+    const docType = document.getElementById('docType').value;
     const fileInput = document.getElementById('pdfFile');
     const namesInput = document.getElementById('namesInput').value;
     const companiesInput = document.getElementById('companiesInput').value;
@@ -87,58 +180,110 @@
     const table = document.getElementById('mappingTable');
 
     if (!fileInput.files[0]) {
-      alert('PDF 파일을 선택해주세요.');
+      alert('파일을 선택해주거나 드래그 앤 드롭 존에 넣어주세요.');
+      return;
+    }
+
+    const mapping = [];
+    let aCount = 1, bCount = 1;
+
+    if (namesInput.trim()) {
+      namesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
+        mapping.push({ text: name, code: mode === 'black' ? '⬛' : `A${aCount++}`, type: '인물' });
+      });
+    }
+
+    if (companiesInput.trim()) {
+      companiesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(comp => {
+        mapping.push({ text: comp, code: mode === 'black' ? '⬛' : `B${bCount++}`, type: '업체/기관' });
+      });
+    }
+
+    const isAllMaskMode = (mapping.length === 0);
+
+    if (isAllMaskMode && mode === 'pseudo') {
+      alert('일련번호 가명화(A1, B1)를 적용하려면 인물 이름이나 업체 상호를 최소 1개 이상 입력해주세요.');
       return;
     }
 
     status.className = 'loading';
-    status.innerText = '메모리 상에서 PDF 분석 및 변환 진행 중... (파일 크기에 따라 수초 소요)';
-    table.style.display = 'none';
+    if (isAllMaskMode) {
+      status.innerText = '입력 항목이 없어 [문서 전체 텍스트 영역 검은 가림]을 진행합니다...';
+      table.style.display = 'none';
+    } else {
+      status.innerText = '메모리 상에서 특정 지정 단어 처리 중...';
+      renderMappingTable(mapping, mode);
+    }
 
     try {
-      // 1. 단어 매핑 구축
-      const mapping = [];
-      let aCount = 1, bCount = 1;
+      if (docType === 'text') {
+        await processStandardPDF(fileInput.files[0], mapping, mode, isAllMaskMode);
+      } else {
+        await processOCRDocument(fileInput.files[0], mapping, mode, isAllMaskMode);
+      }
+    } catch (err) {
+      console.error(err);
+      status.className = 'error';
+      status.innerText = `오류 발생: ${err.message}`;
+    }
+  }
 
-      if (namesInput.trim()) {
-        namesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
-          mapping.push({ 
-            text: name, 
-            code: mode === 'black' ? '⬛' : `A${aCount++}`, 
-            type: '인물' 
-          });
-        });
+  // 1. 일반 PDF 처리 (PDF.js)
+  async function processStandardPDF(file, mapping, mode, isAllMaskMode) {
+    const fileBytes = await file.arrayBuffer();
+    const loadingTask = pdfjsLib.getDocument({ data: fileBytes });
+    const pdfDoc = await loadingTask.promise;
+    const newPdfDoc = await PDFLib.PDFDocument.create();
+
+    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.5 });
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      const textContent = await page.getTextContent();
+      
+      for (const item of textContent.items) {
+        const itemText = item.str.trim();
+        if (!itemText) continue;
+
+        const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+        const x = tx[4];
+        const y = tx[5] - (item.height * viewport.scale);
+        const width = item.width * viewport.scale;
+        const height = item.height * viewport.scale;
+
+        applyMaskToCanvas(ctx, itemText, x, y, width, height, viewport.scale, mapping, mode, isAllMaskMode);
       }
 
-      if (companiesInput.trim()) {
-        companiesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(comp => {
-          mapping.push({ 
-            text: comp, 
-            code: mode === 'black' ? '⬛' : `B${bCount++}`, 
-            type: '업체/기관' 
-          });
-        });
-      }
+      await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
+    }
 
-      if (mapping.length === 0) {
-        alert('처리할 인물 이름이나 업체 상호를 최소 1개 이상 입력해주세요.');
-        status.innerText = '';
-        return;
-      }
+    await downloadPdf(newPdfDoc, file.name, isAllMaskMode, mode);
+  }
 
-      renderMappingTable(mapping, mode);
+  // 2. 스캔본/사진 문서 처리 (Tesseract.js OCR)
+  async function processOCRDocument(file, mapping, mode, isAllMaskMode) {
+    const status = document.getElementById('status');
+    status.innerText = 'OCR 한국어 엔진 로딩 중...';
 
-      // 2. 메모리 파일 로드
-      const fileBytes = await fileInput.files[0].arrayBuffer();
+    const worker = await Tesseract.createWorker('kor');
+    const newPdfDoc = await PDFLib.PDFDocument.create();
+
+    if (file.type === 'application/pdf') {
+      const fileBytes = await file.arrayBuffer();
       const loadingTask = pdfjsLib.getDocument({ data: fileBytes });
       const pdfDoc = await loadingTask.promise;
-      
-      const newPdfDoc = await PDFLib.PDFDocument.create();
 
       for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+        status.innerText = `${pageNum} / ${pdfDoc.numPages} 페이지 OCR 분석 중...`;
         const page = await pdfDoc.getPage(pageNum);
         const viewport = page.getViewport({ scale: 1.5 });
-        
+
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         canvas.width = viewport.width;
@@ -146,63 +291,89 @@
 
         await page.render({ canvasContext: ctx, viewport: viewport }).promise;
 
-        const textContent = await page.getTextContent();
+        const ret = await worker.recognize(canvas);
         
-        for (const item of textContent.items) {
-          const itemText = item.str.trim();
-          if (!itemText) continue;
-
-          mapping.forEach(m => {
-            if (itemText.includes(m.text)) {
-              const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
-              const x = tx[4];
-              const y = tx[5] - (item.height * viewport.scale);
-              const width = item.width * viewport.scale;
-              const height = item.height * viewport.scale;
-
-              if (mode === 'black') {
-                ctx.fillStyle = '#000000';
-                ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
-              } else {
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
-
-                ctx.fillStyle = '#0056b3';
-                ctx.font = `bold ${12 * viewport.scale}px sans-serif`;
-                ctx.fillText(m.code, x, y + height - 2);
-              }
-            }
-          });
+        for (const word of ret.data.words) {
+          const { x0, y0, x1, y1 } = word.bbox;
+          applyMaskToCanvas(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAllMaskMode);
         }
 
-        const imgDataUrl = canvas.toDataURL('image/png');
-        const pngImage = await newPdfDoc.embedPng(imgDataUrl);
-        
-        const newPage = newPdfDoc.addPage([viewport.width, viewport.height]);
-        newPage.drawImage(pngImage, {
-          x: 0,
-          y: 0,
-          width: viewport.width,
-          height: viewport.height,
-        });
+        await appendCanvasToPdf(newPdfDoc, canvas, viewport.width, viewport.height);
+      }
+    } else {
+      status.innerText = '이미지 OCR 분석 중...';
+      const img = await loadImage(file);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      const ret = await worker.recognize(canvas);
+
+      for (const word of ret.data.words) {
+        const { x0, y0, x1, y1 } = word.bbox;
+        applyMaskToCanvas(ctx, word.text, x0, y0, x1 - x0, y1 - y0, 1.0, mapping, mode, isAllMaskMode);
       }
 
-      const pdfBytesOutput = await newPdfDoc.save();
-      const blob = new Blob([pdfBytesOutput], { type: 'application/pdf' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      
-      const prefix = mode === 'black' ? '전체마킹' : '가명화';
-      link.download = `${prefix}_${fileInput.files[0].name}`;
-      link.click();
-
-      status.className = 'success';
-      status.innerText = `처리 완료! [${prefix}] 처리된 PDF 파일이 다운로드되었습니다.`;
-    } catch (err) {
-      console.error(err);
-      status.className = 'error';
-      status.innerText = `오류 발생: ${err.message}\n(브라우저 콘솔 F12에서 상세 내용을 확인할 수 있습니다.)`;
+      await appendCanvasToPdf(newPdfDoc, canvas, img.width, img.height);
     }
+
+    await worker.terminate();
+    await downloadPdf(newPdfDoc, file.name, isAllMaskMode, mode);
+  }
+
+  function applyMaskToCanvas(ctx, targetText, x, y, width, height, scale, mapping, mode, isAllMaskMode) {
+    if (isAllMaskMode) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
+    } else {
+      mapping.forEach(m => {
+        if (targetText.includes(m.text)) {
+          if (mode === 'black') {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
+          } else {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
+
+            ctx.fillStyle = '#0056b3';
+            ctx.font = `bold ${14 * scale}px sans-serif`;
+            ctx.fillText(m.code, x, y + height - 2);
+          }
+        }
+      });
+    }
+  }
+
+  async function appendCanvasToPdf(pdfDoc, canvas, width, height) {
+    const imgDataUrl = canvas.toDataURL('image/png');
+    const pngImage = await pdfDoc.embedPng(imgDataUrl);
+    const newPage = pdfDoc.addPage([width, height]);
+    newPage.drawImage(pngImage, { x: 0, y: 0, width, height });
+  }
+
+  async function downloadPdf(pdfDoc, originalName, isAllMaskMode, mode) {
+    const status = document.getElementById('status');
+    const pdfBytesOutput = await pdfDoc.save();
+    const blob = new Blob([pdfBytesOutput], { type: 'application/pdf' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    
+    const prefix = isAllMaskMode ? '전체블라인드' : (mode === 'black' ? '선택마킹' : '가명화');
+    link.download = `${prefix}_${originalName.split('.')[0]}.pdf`;
+    link.click();
+
+    status.className = 'success';
+    status.innerText = `처리 완료! [${prefix}] 처리된 PDF 파일이 다운로드되었습니다.`;
+  }
+
+  function loadImage(file) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.src = URL.createObjectURL(file);
+    });
   }
 
   function renderMappingTable(mapping, mode) {
