@@ -4,8 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF 메모리 기반 개인정보 처리 도구</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <!-- 로딩 안정성이 높은 CDN으로 교체 -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <style>
     body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 30px; background-color: #f4f7f6; color: #333; }
     .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
@@ -15,7 +16,6 @@
     input[type="text"], input[type="file"] { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
     .help-text { font-size: 0.85em; color: #666; margin-top: 4px; }
     
-    /* 버튼 스타일 */
     .btn-group { display: flex; gap: 10px; margin-top: 20px; }
     button { flex: 1; padding: 14px; font-size: 15px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; transition: background 0.2s; }
     .btn-black { background: #212529; color: white; }
@@ -23,7 +23,11 @@
     .btn-pseudo { background: #007bff; color: white; }
     .btn-pseudo:hover { background: #0056b3; }
     
-    #status { margin-top: 20px; font-weight: bold; color: #28a745; text-align: center; white-space: pre-line; }
+    #status { margin-top: 20px; font-weight: bold; text-align: center; white-space: pre-line; }
+    .success { color: #28a745; }
+    .error { color: #dc3545; }
+    .loading { color: #007bff; }
+    
     #mappingTable { margin-top: 20px; width: 100%; border-collapse: collapse; }
     #mappingTable th, #mappingTable td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 14px; }
     #mappingTable th { background-color: #f8f9fa; color: #333; }
@@ -72,7 +76,8 @@
 </div>
 
 <script>
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  // GitHub Pages CORS 에러 방지: 워커 인라인 설정
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
 
   async function processPDF(mode) {
     const fileInput = document.getElementById('pdfFile');
@@ -86,77 +91,134 @@
       return;
     }
 
-    status.innerText = '메모리 상에서 PDF 분석 및 변환 진행 중...';
+    status.className = 'loading';
+    status.innerText = '메모리 상에서 PDF 분석 및 변환 진행 중... (파일 크기에 따라 수초 소요)';
     table.style.display = 'none';
 
-    // 1. 단어 매핑 구축
-    const mapping = [];
-    let aCount = 1, bCount = 1;
+    try {
+      // 1. 단어 매핑 구축
+      const mapping = [];
+      let aCount = 1, bCount = 1;
 
-    if (namesInput.trim()) {
-      namesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
-        mapping.push({ 
-          text: name, 
-          code: mode === 'black' ? '⬛' : `A${aCount++}`, 
-          type: '인물' 
+      if (namesInput.trim()) {
+        namesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(name => {
+          mapping.push({ 
+            text: name, 
+            code: mode === 'black' ? '⬛' : `A${aCount++}`, 
+            type: '인물' 
+          });
         });
-      });
-    }
+      }
 
-    if (companiesInput.trim()) {
-      companiesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(comp => {
-        mapping.push({ 
-          text: comp, 
-          code: mode === 'black' ? '⬛' : `B${bCount++}`, 
-          type: '업체/기관' 
+      if (companiesInput.trim()) {
+        companiesInput.split(',').map(s => s.trim()).filter(Boolean).forEach(comp => {
+          mapping.push({ 
+            text: comp, 
+            code: mode === 'black' ? '⬛' : `B${bCount++}`, 
+            type: '업체/기관' 
+          });
         });
-      });
-    }
+      }
 
-    if (mapping.length === 0) {
-      alert('처리할 인물 이름이나 업체 상호를 최소 1개 이상 입력해주세요.');
-      status.innerText = '';
-      return;
-    }
+      if (mapping.length === 0) {
+        alert('처리할 인물 이름이나 업체 상호를 최소 1개 이상 입력해주세요.');
+        status.innerText = '';
+        return;
+      }
 
-    // 일련번호 모드일 때 매핑표 출력
-    renderMappingTable(mapping, mode);
+      renderMappingTable(mapping, mode);
 
-    // 2. 메모리 읽기 및 변환
-    const fileBytes = await fileInput.files[0].arrayBuffer();
-    const pdfDoc = await pdfjsLib.getDocument({ data: fileBytes }).promise;
-    const newPdfDoc = await PDFLib.PDFDocument.create();
-
-    for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-      const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1.5 }); // 선명도 1.5배
+      // 2. 메모리 파일 로드
+      const fileBytes = await fileInput.files[0].arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: fileBytes });
+      const pdfDoc = await loadingTask.promise;
       
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      const newPdfDoc = await PDFLib.PDFDocument.create();
 
-      // 렌더링
-      await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+      for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+        const page = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 1.5 });
+        
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
 
-      // 텍스트 탐색 및 가림/변환 처리
-      const textContent = await page.getTextContent();
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+        const textContent = await page.getTextContent();
+        
+        for (const item of textContent.items) {
+          const itemText = item.str.trim();
+          if (!itemText) continue;
+
+          mapping.forEach(m => {
+            if (itemText.includes(m.text)) {
+              const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+              const x = tx[4];
+              const y = tx[5] - (item.height * viewport.scale);
+              const width = item.width * viewport.scale;
+              const height = item.height * viewport.scale;
+
+              if (mode === 'black') {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
+              } else {
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(x - 2, y - 2, width + 4, height + 4);
+
+                ctx.fillStyle = '#0056b3';
+                ctx.font = `bold ${12 * viewport.scale}px sans-serif`;
+                ctx.fillText(m.code, x, y + height - 2);
+              }
+            }
+          });
+        }
+
+        const imgDataUrl = canvas.toDataURL('image/png');
+        const pngImage = await newPdfDoc.embedPng(imgDataUrl);
+        
+        const newPage = newPdfDoc.addPage([viewport.width, viewport.height]);
+        newPage.drawImage(pngImage, {
+          x: 0,
+          y: 0,
+          width: viewport.width,
+          height: viewport.height,
+        });
+      }
+
+      const pdfBytesOutput = await newPdfDoc.save();
+      const blob = new Blob([pdfBytesOutput], { type: 'application/pdf' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
       
-      for (const item of textContent.items) {
-        const itemText = item.str.trim();
-        if (!itemText) continue;
+      const prefix = mode === 'black' ? '전체마킹' : '가명화';
+      link.download = `${prefix}_${fileInput.files[0].name}`;
+      link.click();
 
-        mapping.forEach(m => {
-          if (itemText.includes(m.text)) {
-            const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
-            const x = tx[4];
-            const y = tx[5] - (item.height * viewport.scale);
-            const width = item.width * viewport.scale;
-            const height = item.height * viewport.scale;
+      status.className = 'success';
+      status.innerText = `처리 완료! [${prefix}] 처리된 PDF 파일이 다운로드되었습니다.`;
+    } catch (err) {
+      console.error(err);
+      status.className = 'error';
+      status.innerText = `오류 발생: ${err.message}\n(브라우저 콘솔 F12에서 상세 내용을 확인할 수 있습니다.)`;
+    }
+  }
 
-            if (mode === 'black') {
-              // Mode 1: 검은 상자로 완벽 마킹
-              ctx.fillStyle = '#000000';
-              ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
-            } else {
-              // Mode 2: 흰 바탕 지우기 후 일련번호(A
+  function renderMappingTable(mapping, mode) {
+    const tbody = document.getElementById('mappingBody');
+    tbody.innerHTML = '';
+
+    mapping.forEach(m => {
+      const tr = document.createElement('tr');
+      const displayCode = mode === 'black' ? '<span style="color:red;">[완전 가림]</span>' : `<strong>${m.code}</strong>`;
+      tr.innerHTML = `<td>${m.type}</td><td>${m.text}</td><td>${displayCode}</td>`;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('mappingTable').style.display = 'table';
+  }
+</script>
+
+</body>
+</html>
