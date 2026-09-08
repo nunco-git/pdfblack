@@ -141,10 +141,12 @@
 
   .btn-black {
     flex: 1 1 200px;
-    background: #a7f3d0; color: #065f46;
-    box-shadow: 0 2px 6px rgba(16,185,129,0.15);
+    background: #eff6ff; color: #1d4ed8; border: 2px solid #3b82f6;
+    box-shadow: 0 2px 6px rgba(59,130,246,0.15);
   }
-  .btn-black:hover { background: #6ee7b7; transform: translateY(-2px); box-shadow: 0 6px 14px rgba(16,185,129,0.22); }
+  .btn-black:hover { background: #dbeafe; border-color: #1d4ed8; transform: translateY(-2px); box-shadow: 0 6px 14px rgba(59,130,246,0.25); }
+  /* .btn-group button 규칙(font-size:13px)보다 우선 적용되도록 더 구체적인 선택자 사용 */
+  .btn-group .btn-black { font-size: 1.15em; font-weight: 800; padding: 15px 10px; }
 
   .btn-pseudo {
     flex: 1 1 200px;
