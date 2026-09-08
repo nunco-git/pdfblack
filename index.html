@@ -153,10 +153,17 @@
   }
   .btn-pseudo:hover { background: #c4b5fd; transform: translateY(-2px); box-shadow: 0 6px 14px rgba(139,92,246,0.22); }
 
-  #status { margin-top: 16px; font-weight: 700; text-align: center; white-space: pre-line; font-size: 0.9em; }
+  #status, #status2 { margin-top: 16px; font-weight: 700; text-align: center; white-space: pre-line; font-size: 0.9em; }
   .success { color: #16a34a; }
   .error { color: #ef4444; }
   .loading { color: #3b82f6; }
+
+  @keyframes review-flash-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(59,130,246,0.55); }
+    70%  { box-shadow: 0 0 0 14px rgba(59,130,246,0); }
+    100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+  }
+  #reviewContainer.review-flash { animation: review-flash-pulse 1s ease-out 2; border-radius: 12px; }
 
   /* 결과 표 영역 */
   .table-container { margin-top: 22px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; padding: 16px; }
@@ -369,6 +376,7 @@
     <div class="btn-group">
       <button class="btn-black" style="flex:1 1 100%;" onclick="runSecondDetection()">🔎 2차 탐지 실행 (추가 가림 + 복귀 반영)</button>
     </div>
+    <div id="status2"></div>
   </div>
 </div>
 </div>
@@ -480,6 +488,9 @@
     const status = document.getElementById('status');
     status.innerText = '';
     status.className = '';
+    const status2 = document.getElementById('status2');
+    status2.innerText = '';
+    status2.className = '';
     
     detectedRecords = [];
     document.getElementById('mappingBody').innerHTML = '';
@@ -685,13 +696,28 @@
     document.getElementById('reviewContainer').style.display = 'block';
 
     const status = document.getElementById('status');
-    status.className = 'success';
+    const status2 = document.getElementById('status2');
+    const resultClass = 'success';
     const parts = [];
     if (addedCount > 0) parts.push(`${addedCount}건 추가 가림`);
     if (restoredCount > 0) parts.push(`${restoredCount}건 복귀(마스킹 해제)`);
-    status.innerText = parts.length
-      ? `2차 탐지 완료! ${parts.join(', ')} 처리했습니다. 아래에서 확인 후 최종 다운로드를 눌러주세요.`
+    const message = parts.length
+      ? `2차 탐지 완료! ${parts.join(', ')} 처리했습니다. 위쪽 미리보기·결과표에 반영되었습니다. 확인 후 최종 다운로드를 눌러주세요.`
       : '입력한 단어와 일치하는 텍스트를 찾지 못했습니다. 표기(띄어쓰기 등)를 확인해주세요.';
+
+    status.className = resultClass;
+    status.innerText = message;
+    status2.className = resultClass;
+    status2.innerText = message;
+
+    // 2차 탐지 버튼은 화면 아래쪽에 있어 위쪽 미리보기 변화가 눈에 잘 안 띌 수 있으므로,
+    // 결과 확인 영역으로 자동 스크롤하고 잠시 테두리를 깜빡여 변경 사실을 알려줍니다.
+    const reviewContainer = document.getElementById('reviewContainer');
+    reviewContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    reviewContainer.classList.remove('review-flash');
+    void reviewContainer.offsetWidth; // 애니메이션 재시작을 위한 리플로우 강제
+    reviewContainer.classList.add('review-flash');
+    setTimeout(() => reviewContainer.classList.remove('review-flash'), 2100);
   }
 
   // 1. 일반 PDF 분석 — 마스킹은 바로 그리지 않고 박스 정보만 수집(검수용)
@@ -976,9 +1002,12 @@
       link.download = `${prefix}_${baseName}.hwpx`;
       link.click();
 
+      // 최종 마스킹 처리 내역을 확인할 수 있도록 결과 엑셀(CSV)도 함께 다운로드
+      exportToExcel(baseName);
+
       const activeCount = allBoxes.filter(b => b.hwpx && b.active).length;
       status.className = 'success';
-      status.innerText = `최종 다운로드 완료! 검수를 거쳐 총 ${activeCount}건의 개인정보가 [${prefix}] 처리된 HWPX 파일을 받았습니다.`;
+      status.innerText = `최종 다운로드 완료! 검수를 거쳐 총 ${activeCount}건의 개인정보가 [${prefix}] 처리된 HWPX 파일을 받았습니다. (처리 내역 엑셀 파일도 함께 다운로드되었습니다)`;
     } catch (err) {
       console.error(err);
       status.className = 'error';
@@ -1217,11 +1246,15 @@
 
     const prefixMap = { black: '개인정보가림(검정)', gray: '개인정보가림(회색)', initial: '가명화', code: '가명화' };
     const prefix = prefixMap[maskStyle] || '개인정보마스킹';
-    link.download = `${prefix}_${originalName.split('.')[0]}.pdf`;
+    const baseName = originalName.split('.')[0];
+    link.download = `${prefix}_${baseName}.pdf`;
     link.click();
 
+    // 최종 마스킹 처리 내역을 확인할 수 있도록 결과 엑셀(CSV)도 함께 다운로드
+    exportToExcel(baseName);
+
     status.className = 'success';
-    status.innerText = `최종 다운로드 완료! 검수를 거쳐 총 ${count}건의 개인정보가 [${prefix}] 처리되었습니다.`;
+    status.innerText = `최종 다운로드 완료! 검수를 거쳐 총 ${count}건의 개인정보가 [${prefix}] 처리되었습니다. (처리 내역 엑셀 파일도 함께 다운로드되었습니다)`;
   }
 
   // ============================================================
@@ -1464,7 +1497,7 @@
     document.getElementById('tableContainer').style.display = 'block';
   }
 
-  function exportToExcel() {
+  function exportToExcel(fileBaseName) {
     if (allBoxes.length === 0) {
       alert('다운로드할 내역이 없습니다.');
       return;
@@ -1486,9 +1519,10 @@
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    
+
+    const name = fileBaseName ? `개인정보_처리내역_${fileBaseName}` : `개인정보_치환결과내역_${new Date().toISOString().slice(0,10)}`;
     link.setAttribute('href', url);
-    link.setAttribute('download', `개인정보_치환결과내역_${new Date().toISOString().slice(0,10)}.csv`);
+    link.setAttribute('download', `${name}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
