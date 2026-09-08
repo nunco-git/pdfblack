@@ -314,9 +314,12 @@
   <div class="table-container" id="tableContainer" style="display:none;">
     <div class="table-header">
       <span class="table-title">📋 개인정보 치환 / 가림 처리 결과 내역</span>
-      <button class="btn-excel" onclick="exportToExcel()">📊 엑셀(CSV) 다운로드</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-excel" id="tableToggleBtn" onclick="toggleTableCollapse()">▲ 접기</button>
+        <button class="btn-excel" onclick="exportToExcel()">📊 엑셀(CSV) 다운로드</button>
+      </div>
     </div>
-    <div class="table-scroll">
+    <div class="table-scroll" id="tableScrollWrap">
       <table id="mappingTable">
         <thead>
           <tr>
@@ -461,6 +464,7 @@
   let currentFileObj = null;
   let currentProcessMode = 'black'; // 마지막으로 실행한 마스킹 방식(black/gray/initial/code) - 파일명·수동박스 스타일에 사용
   let autoCodeCounter = 1; // '일련번호 방식' 선택 시 자동 탐지 항목에 매길 번호(실행마다 초기화)
+  let tableCollapsed = false; // 결과 내역 표 접힘 상태(2차 탐지 등으로 재렌더링돼도 유지)
 
   // 하위 호환: 표 렌더링 등에서 참조할 수 있어 남겨두되, 실제 소스는 allBoxes
   let detectedRecords = [];
@@ -495,6 +499,9 @@
     detectedRecords = [];
     document.getElementById('mappingBody').innerHTML = '';
     document.getElementById('tableContainer').style.display = 'none';
+    tableCollapsed = false;
+    document.getElementById('tableScrollWrap').style.display = '';
+    document.getElementById('tableToggleBtn').innerText = '▲ 접기';
 
     pagesData = [];
     hwpxState = null;
@@ -1002,12 +1009,9 @@
       link.download = `${prefix}_${baseName}.hwpx`;
       link.click();
 
-      // 최종 마스킹 처리 내역을 확인할 수 있도록 결과 엑셀(CSV)도 함께 다운로드
-      exportToExcel(baseName);
-
       const activeCount = allBoxes.filter(b => b.hwpx && b.active).length;
       status.className = 'success';
-      status.innerText = `최종 다운로드 완료! 검수를 거쳐 총 ${activeCount}건의 개인정보가 [${prefix}] 처리된 HWPX 파일을 받았습니다. (처리 내역 엑셀 파일도 함께 다운로드되었습니다)`;
+      status.innerText = `최종 다운로드 완료! 검수를 거쳐 총 ${activeCount}건의 개인정보가 [${prefix}] 처리된 HWPX 파일을 받았습니다.`;
     } catch (err) {
       console.error(err);
       status.className = 'error';
@@ -1250,11 +1254,8 @@
     link.download = `${prefix}_${baseName}.pdf`;
     link.click();
 
-    // 최종 마스킹 처리 내역을 확인할 수 있도록 결과 엑셀(CSV)도 함께 다운로드
-    exportToExcel(baseName);
-
     status.className = 'success';
-    status.innerText = `최종 다운로드 완료! 검수를 거쳐 총 ${count}건의 개인정보가 [${prefix}] 처리되었습니다. (처리 내역 엑셀 파일도 함께 다운로드되었습니다)`;
+    status.innerText = `최종 다운로드 완료! 검수를 거쳐 총 ${count}건의 개인정보가 [${prefix}] 처리되었습니다.`;
   }
 
   // ============================================================
@@ -1458,6 +1459,13 @@
       img.onload = () => resolve(img);
       img.src = URL.createObjectURL(file);
     });
+  }
+
+  // 결과 내역 표를 접었다 펼 수 있게 함(2차 탐지 작업 중 표가 화면을 많이 차지해 불편한 것을 개선)
+  function toggleTableCollapse() {
+    tableCollapsed = !tableCollapsed;
+    document.getElementById('tableScrollWrap').style.display = tableCollapsed ? 'none' : '';
+    document.getElementById('tableToggleBtn').innerText = tableCollapsed ? '▼ 펼치기' : '▲ 접기';
   }
 
   function renderDetectedRecords() {
