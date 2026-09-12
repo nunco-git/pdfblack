@@ -6,14 +6,14 @@
 <title>스마트 개인정보 마스킹</title>
 
 <!-- 본문용 Pretendard, 제목용 Jua 폰트 (한글병합기와 동일) -->
-<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css" integrity="sha384-2nNKoOPayicGa+aRguOQuiZP+RqQ4G3jalfDeOgftkKD7zBM2gJXTwcFqCZltdv0">
 <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
 
 <!-- PDF.js, pdf-lib, Tesseract.js, JSZip(HWPX 처리용) -->
-<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js" integrity="sha384-uLiAv4VcjM5H2Jsqzl8EajEaxPugj1CIzQaCjQ8c5//vC+elhxO5pZfXGxoLQi1W" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js" integrity="sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.4/dist/tesseract.min.js" integrity="sha384-+56qagDlzJ3YYkDcyAXRdhrP7/+ai8qJcS6HpjACl2idDoCyCqRf5VVi7E/XkGae" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
 
 <style>
   * { box-sizing: border-box; }
@@ -61,7 +61,7 @@
   }
   .top-col-title:hover { border-color: #fdba74; box-shadow: 0 6px 16px rgba(194,65,12,0.12); transform: translateY(-1px); }
   .title-icon { font-size: 2rem; line-height: 1; filter: drop-shadow(0 1px 1px rgba(194,65,12,0.15)); }
-  .title-main { margin: 0; color: #9a3412; font-size: 1.4rem; font-weight: 400; font-family: 'Jua', 'Pretendard Variable', sans-serif; line-height: 1.3; letter-spacing: -0.1px; }
+  .title-main { margin: 0; color: #9a3412; font-size: 1.8rem; font-weight: 400; font-family: 'Jua', 'Pretendard Variable', sans-serif; line-height: 1.3; letter-spacing: -0.1px; }
   .title-security-badge { background: #dcfce7; color: #166534; font-size: 0.78rem; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
 
   /* 특징 요약 배너 (가운데) */
