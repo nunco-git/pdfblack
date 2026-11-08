@@ -232,6 +232,25 @@
     box-shadow: 0 2px 6px rgba(16,185,129,0.15);
   }
   .btn-finalize:hover { background: #6ee7b7; transform: translateY(-2px); box-shadow: 0 6px 14px rgba(16,185,129,0.22); }
+
+/*mobile-fontfix*/
+@media (max-width:640px){
+.title-security-badge{font-size:14px !important}
+.security-features li{font-size:14px !important}
+.security-features .feat-icon{font-size:14px !important}
+.security-features strong{font-size:14px !important}
+.drop-zone span.drop-sub{font-size:14px !important}
+#fileNameDisplay{font-size:14px !important}
+input[type="text"], select{font-size:15px !important}
+.help-text{font-size:14px !important}
+.btn-group button{font-size:15px !important}
+.btn-reset{font-size:14px !important}
+.btn-excel{font-size:15px !important}
+.summary-badge{font-size:15px !important}
+.review-page-label{font-size:15px !important}
+.mask-box-del{font-size:14px !important}
+.btn-row-del{font-size:14px !important}
+}
 </style>
 </head>
 <body>
@@ -1559,6 +1578,18 @@
   function escapeHtml(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
+</script>
+<script>/*mobile-fontfix-js*/
+(function(){try{if(!window.matchMedia||!matchMedia('(max-width:640px)').matches)return;var MIN=14;
+function fix(root){var list=[];if(root.nodeType!==1)return;list.push(root);var q=root.querySelectorAll('*');for(var i=0;i<q.length;i++)list.push(q[i]);
+for(var j=0;j<list.length;j++){var e=list[j];if(e.__mf||/^(SCRIPT|STYLE|SVG|CANVAS|PATH|G|LINE|RECT|CIRCLE|TEXT|TSPAN)$/i.test(e.tagName))continue;var has=false;for(var n=e.firstChild;n;n=n.nextSibling){if(n.nodeType===3&&n.nodeValue.trim()){has=true;break}}
+if(!has)continue;e.__mf=1;var f=parseFloat(getComputedStyle(e).fontSize);if(f>0&&f<MIN)e.style.setProperty('font-size',MIN+'px','important')}}
+function run(){fix(document.body)}
+var t=null;function later(){clearTimeout(t);t=setTimeout(run,300)}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run);else run();
+window.addEventListener('load',run);
+new MutationObserver(later).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+}catch(e){}})();
 </script>
 </body>
 </html>
